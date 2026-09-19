@@ -112,7 +112,7 @@ app.post('/api/format', (req, res) => {
     if (!source) return res.status(400).json({ error: 'Source metadata is required' });
 
     const validated = validateMetadata(source);
-    const cleaned = cleanLlmOutput(validated, text || '', { pageCount, formatType });
+    const cleaned = cleanLlmOutput(validated, text || '', { pageCount, formatType, preserveSummary: true });
 
     const result = buildMarcRecord(cleaned, {
       agency: process.env.CATALOGING_AGENCY || '',

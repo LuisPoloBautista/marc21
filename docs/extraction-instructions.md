@@ -16,3 +16,5 @@ No sustituir fechas por el primer año encontrado, ni extensión por número té
 Materias propuestas: segundo indicador 4, sin `$2` que atribuya un tesauro no consultado. La etiqueta «Propuesta automática» aparece en la revisión. `$2automatico` no se inventa como código de fuente. Referencia: [MARC 650](https://www.loc.gov/marc/bibliographic/bd650.html).
 
 Agencia: opcional mediante `CATALOGING_AGENCY` en servidor; si no está configurada, no inventar 040 $a/$c. 040 $b indica español; 008/041 corresponden al idioma observado del recurso.
+
+Las reglas de copyright como año alternativo, resumen literal o generado (máximo 100 palabras) y Dewey propuesto se definen en [la política de catalogación](skill_catalogacion_automatica_rda_llm.md). Las etiquetas de revisión se generan en código.

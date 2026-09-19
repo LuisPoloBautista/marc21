@@ -416,6 +416,7 @@ function renderVerification(source) {
     { key: 'publisher', label: 'Editorial' },
     { key: 'place', label: 'Lugar de publicación' },
     { key: 'year', label: 'Año' },
+    { key: 'copyrightYear', label: 'Año de copyright' },
     { key: 'isbn', label: 'ISBN' },
     { key: 'doi', label: 'DOI' },
     { key: 'edition', label: 'Edición' },
@@ -432,9 +433,8 @@ function renderVerification(source) {
     { key: 'meetingName', label: 'Nombre del evento' },
     { key: 'meetingDate', label: 'Fecha del evento' },
     { key: 'meetingPlace', label: 'Lugar del evento' },
-    { key: 'notes', label: 'Notas' },
+    { key: 'notes', label: 'Resumen' },
     { key: 'dewey', label: 'Clasificación Dewey' },
-    { key: 'lcClassification', label: 'Clasificación LC' },
   ];
 
   let html = '';
@@ -476,7 +476,7 @@ function renderVerification(source) {
 
     html += '<tr><td>' + escapeHtml(f.label) + '</td><td>' + escapeHtml(displayValue) + '</td>';
     html += '<td class="' + statusClass + '">' + statusText + '</td>';
-    html += '<td>' + escapeHtml(ev?.source || 'Sin fuente') + '</td><td>' + escapeHtml(snippet || 'Sin evidencia literal') + '</td></tr>';
+    html += '<td>' + escapeHtml((ev?.source || 'Sin fuente') + (ev?.basis === 'copyright' ? ' · Año tomado del copyright' : '')) + '</td><td>' + escapeHtml(snippet || 'Sin evidencia literal') + '</td></tr>';
   }
 
   tbody.innerHTML = html;

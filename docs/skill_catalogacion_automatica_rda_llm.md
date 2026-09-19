@@ -17,7 +17,12 @@ El idioma de catalogación es español; el idioma del contenido se identifica po
 
 ## Evidencia y revisión
 Cada campo incluye fuente, cita literal breve y estado observado/ambiguo/propuesto. El servidor comprueba que la cita aparezca en la fuente indicada. Esta comprobación no certifica la exactitud del OCR ni la interpretación bibliográfica. No presentar puntuaciones de confianza inventadas como garantías.
-Materias y resumen se proponen desde título, índice, resumen o introducción seleccionados: hasta 5 materias y 2 oraciones. No atribuir un tesauro sin consultarlo. Clasificación solo si consta explícitamente; revisar su pertinencia.
+Materias y resumen se proponen desde título, índice, resumen o introducción seleccionados: hasta 5 materias. Se copia íntegro el Abstract/Resumen visible, sin traducción; si no hay uno visible se genera un resumen de máximo estricto de 100 palabras. No atribuir un tesauro sin consultarlo. Proponer únicamente Dewey a partir de las materias, marcarlo como propuesta automática y revisar su pertinencia. No generar LC.
 
 ## Salida e integración
 Evidencia → JSON bibliográfico → revisión → MARC21 local → MARCXML o formulario Koha. La integración no guarda automáticamente. El catalogador revisa autoridades, duplicados, descripción física y campos obligatorios antes de guardar. Las consultas externas, Z39.50/SRU, detección automática de duplicados e ISO2709 son ampliaciones posibles, no funciones implementadas.
+
+## Reglas de año, resumen y revisión
+Año: priorizar publicación; si falta, usar el año explícito de Copyright Year/Copyright/© de la manifestación, conservando su fuente y la indicación de copyright. No confundirlo con fechas de impresión.
+Resumen: transcribir íntegramente el Abstract/Resumen visible en su idioma (`notesKind=transcribed`); si no existe, generar a partir de la evidencia un máximo estricto de 100 palabras (`notesKind=generated`), contado por espacios y limitado también en código. La transcripción no está sujeta a ese límite. Dewey se propone con base en las materias, no como dato autorizado; LC se omite.
+Las etiquetas «Sin evidencia literal» y «Cita localizada ✓» son texto fijo de la interfaz. El modelo devuelve fuentes, citas breves y estados compactos; el servidor verifica la coincidencia. El resumen transcrito se reutiliza como cita sin pedirlo dos veces al modelo.

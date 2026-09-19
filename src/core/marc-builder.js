@@ -71,7 +71,6 @@ export function buildMarcRecord(metadata, opts = {}) {
   const meetingDate = asStr(metadata.meetingDate);
   const meetingPlace = asStr(metadata.meetingPlace);
   const dewey = asStr(metadata.dewey);
-  const lcClassification = asStr(metadata.lcClassification);
 
   const leaderType = 'i';
   const bibliographicLevel = isAnalytical ? 'a' : 'm';
@@ -305,7 +304,7 @@ export function buildMarcRecord(metadata, opts = {}) {
     if (meetingPlace) data['711'].c = meetingPlace;
   }
 
-  if (notes) data['520'] = { ind1: ' ', ind2: ' ', a: notes.endsWith('.') ? notes : notes + '.' };
+  if (notes) data['520'] = { ind1: ' ', ind2: ' ', a: notes };
 
   function isPlace(part) {
     return /^(México|Mexico|España|Spain|Estados Unidos|USA|Francia|France|Alemania|Germany|Inglaterra|England|Europa|Asia|África|América Latina|Sudamérica|Centroamérica|Argentina|Colombia|Perú|Chile|Venezuela|Cuba|Puerto Rico|Brasil|Canadá|China|Japón|India|Rusia|Australia|Nueva Zelanda|Londres|Madrid|París|Berlín|Roma|Buenos Aires|Bogotá|Lima|Santiago|Caracas|La Habana|Ciudad de México|CDMX|Oaxaca|Puebla|Veracruz|Jalisco|Yucatán|Nuevo León|Guanajuato|Michoacán)/i.test(part);
@@ -353,12 +352,7 @@ export function buildMarcRecord(metadata, opts = {}) {
 
   data['856'] = { ind1: ' ', ind2: ' ', a: '' };
 
-  const effectiveLc = lcClassification;
   const effectiveDewey = /^\d{1,3}(\.\d+)?$/.test(dewey) ? dewey : '';
-
-  if (effectiveLc) {
-    data['050'] = { ind1: ' ', ind2: ' ', a: effectiveLc };
-  }
 
   if (effectiveDewey) {
     const deweyClean = effectiveDewey.replace(/[^0-9.]/g, '').trim();

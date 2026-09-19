@@ -1,6 +1,6 @@
 # Metadatos por tipo documental
 
-Campos comunes: `title`, `subtitle`, `author`, `authorRoles`, `language`, `doi`, `subjects`, `notes`, `dewey`, `lcClassification` y `evidence`. «Esencial» significa que debe buscarse y revisarse cuando falte; nunca autoriza inventarlo.
+Campos comunes: `title`, `subtitle`, `author`, `authorRoles`, `language`, `doi`, `subjects`, `notes`, `dewey`, `copyrightYear`, `notesKind` y `evidence`. «Esencial» significa que debe buscarse y revisarse cuando falte; nunca autoriza inventarlo.
 
 | Tipo | Metadatos específicos | Tratamiento MARC |
 |---|---|---|
@@ -12,6 +12,8 @@ Campos comunes: `title`, `subtitle`, `author`, `authorRoles`, `language`, `doi`,
 
 Conservar páginas impresas y numeración preliminar; artículos/capítulos usan rango. Nunca reemplazarlas por la cuenta técnica del PDF. El idioma procede del recurso, no del español de la interfaz. Datos ausentes quedan vacíos en JSON; el borrador MARC puede mostrar las menciones locales de publicación no identificada para revisión.
 
-Roles admitidos: autor, coordinador, compilador, editor, traductor, prologuista, ilustrador, asesor. Mantener roles explícitos y revisar la elección del punto de acceso principal. Las materias son propuestas automáticas; no se declaran autorizadas. 050/082 solo se generan si existe clasificación explícita.
+Roles admitidos: autor, coordinador, compilador, editor, traductor, prologuista, ilustrador, asesor. Mantener roles explícitos y revisar la elección del punto de acceso principal. Las materias son propuestas automáticas; no se declaran autorizadas. Solo se genera 082: Dewey propuesto a partir de las materias y sujeto a revisión. No se genera 050 (LC).
 
 Segunda búsqueda: título y año; editorial en libros/memorias; contenedor en artículos/capítulos; institución y grado en tesis. El resto de ausencias se muestra para revisión, evitando llamadas adicionales sin fin.
+
+Las reglas de copyright como año alternativo, resumen literal o generado (máximo 100 palabras) y Dewey propuesto se definen en [la política de catalogación](skill_catalogacion_automatica_rda_llm.md). Las etiquetas de revisión se generan en código.

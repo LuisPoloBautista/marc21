@@ -107,3 +107,33 @@ test('unrecognized nested response is not silently accepted as empty evidence', 
   assert.equal(result.metadata.title,'Libro');
   assert.equal(calls,2);
 });
+
+test('copyright year fills missing year without replacing publication year', () => {
+  const ev = {source:'Página 2',quote:'Copyright Year 2021',status:'observed'};
+  const source = {copyrightYear:'2021',evidence:{copyrightYear:ev}};
+  const fallback = cleanLlmOutput(structuredClone(source),'Copyright Year 2021');
+  assert.equal(fallback.year,'2021');
+  assert.equal(fallback.evidence.year.basis,'copyright');
+  assert.equal(cleanLlmOutput({...source,year:'2023'},'').year,'2023');
+});
+test('generated summaries have strict 100 word cap; literal abstracts stay intact including MARC and cache', () => {
+  const long = Array.from({length:140},(_,i)=>`word${i}`).join(' ');
+  const generated = cleanLlmOutput({notes:long,notesKind:'generated'},'');
+  assert.equal(generated.notes.split(/\s+/).length,100);
+  assert.equal(generated.evidence.notes.status,'proposed');
+  const original = cleanLlmOutput({notes:long,notesKind:'transcribed',evidence:{notes:{source:'Página 1'}}},'Abstract\n'+long);
+  assert.equal(original.notes,long);
+  assert.equal(original.evidence.notes.quote,long);
+  assert.equal(buildMarcRecord(original)['520'].a,long);
+  assert.equal(cleanLlmOutput(original,'',{preserveSummary:true}).notes,long);
+});
+test('Dewey is a subject-based proposal; LC is removed from metadata and MARC', () => {
+  const meta = cleanLlmOutput({subjects:['Educación'],dewey:'370',lcClassification:'LB'},'');
+  assert.equal(meta.dewey,'370');
+  assert.equal(meta.evidence.dewey.status,'proposed');
+  assert.equal(meta.lcClassification,undefined);
+  const marc = buildMarcRecord({...meta,lcClassification:'LB'});
+  assert.equal(marc['050'],undefined);
+  assert.equal(marc['082'].a,'370');
+  assert.equal(cleanLlmOutput({dewey:'370',subjects:[]},'').dewey,null);
+});

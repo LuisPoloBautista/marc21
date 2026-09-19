@@ -11,7 +11,11 @@ export function scorePage(page, total, format = 'book') {
 }
 export function reduceText(text, limit = 2600) {
   const lines = [...new Set(String(text).split(/\n+/).map(s => s.trim()).filter(Boolean))];
-  const useful = lines.filter((s, i) => i < 12 || /ISBN|ISSN|copyright|©|edici[oó]n|edition|editorial|publisher|serie|colof[oó]n|10\.\d{4,9}/i.test(s));
+  let inSummary = false;
+  const useful = lines.filter((s, i) => {
+    if (/^(?:abstract|resumen)\b/i.test(s)) inSummary = true;
+    else if (/^(?:keywords|palabras clave|introducci[oó]n|introduction)\b/i.test(s)) inSummary = false;
+    return inSummary || i < 12 || /ISBN|ISSN|copyright|©|edici[oó]n|edition|editorial|publisher|serie|colof[oó]n|10\.\d{4,9}/i.test(s); });
   return useful.join('\n').slice(0, limit);
 }
 export function selectEvidence(pages, format = 'book', excluded = [], terms = null) {
@@ -24,7 +28,7 @@ export function selectEvidence(pages, format = 'book', excluded = [], terms = nu
     .sort((a, b) => b.score - a.score || a.page - b.page)
     .filter(p => { const key = p.text.trim(); if (!key) return true; if (seen.has(key)) return false; seen.add(key); return true; })
     .slice(0, terms ? 3 : 10)
-    .map(p => { const text = reduceText(p.text, Math.min(2600, budget)); budget -= text.length; return { ...p, text }; })
+    .map(p => { const text = reduceText(p.text, Math.min(/\b(?:abstract|resumen)\b/i.test(p.text) ? 8000 : 2600, budget)); budget -= text.length; return { ...p, text }; })
     .filter(p => p.text || !usableText(pages.find(o => o.page === p.page)?.text));
 }
 export function evidenceText(pages) {
@@ -37,12 +41,21 @@ export const TYPE_FIELDS = {
   thesis: ['degree','institution','advisor','place','year','pages','corporate'],
   proceedings: ['meetingName','meetingDate','meetingPlace','publisher','place','year','pages','isbn','edition','series','corporate']
 };
-export const COMMON_FIELDS = ['title','subtitle','author','authorRoles','language','doi','subjects','notes','dewey','lcClassification'];
+export const COMMON_FIELDS = ['title','subtitle','author','authorRoles','language','doi','subjects','notes','notesKind','copyrightYear','dewey'];
 
 // Share the budget across sources so later OCR batches cannot be silently discarded.
 export function compactEvidence(text, limit = MAX_EVIDENCE_CHARS) {
   const parts = String(text).split(/(?=\[(?:Página \d+|Imagen \d+|Texto aportado|Metadatos PDF)\])/).filter(s => s.trim());
   if (!parts.length) return '';
-  const quota = Math.max(0, Math.floor((limit - parts.length * 2) / parts.length));
-  return parts.map(p => p.slice(0, quota)).join('\n\n').slice(0, limit);
+  let remaining = Math.max(0, limit - parts.length * 2);
+  const sizes = parts.map(p => Math.min(p.length, 1000));
+  const baseTotal = sizes.reduce((a, b) => a + b, 0);
+  if (baseTotal > remaining) {
+    const quota = Math.floor(remaining / parts.length);
+    return parts.map(p => p.slice(0, quota)).join('\n\n').slice(0, limit);
+  }
+  remaining -= baseTotal;
+  const order = parts.map((p, i) => i).sort((a, b) => Number(/\b(?:abstract|resumen)\b/i.test(parts[b])) - Number(/\b(?:abstract|resumen)\b/i.test(parts[a])));
+  for (const i of order) { const extra = Math.min(remaining, parts[i].length - sizes[i]); sizes[i] += extra; remaining -= extra; }
+  return parts.map((p, i) => p.slice(0, sizes[i])).join('\n\n').slice(0, limit);
 }

@@ -52,13 +52,27 @@ export function cleanLlmOutput(metadata, rawText, opts = {}) {
 
   if (typeof metadata.title === 'string') metadata.title = metadata.title.trim();
 
+  delete metadata.lcClassification;
+  metadata.evidence = metadata.evidence && typeof metadata.evidence === 'object' ? metadata.evidence : {};
+  delete metadata.evidence.lcClassification;
+  if (!metadata.year && /^\d{4}$/.test(String(metadata.copyrightYear || ''))) {
+    metadata.year = String(metadata.copyrightYear);
+    metadata.evidence.year = { ...metadata.evidence.copyrightYear, basis: 'copyright' };
+  }
   if (metadata.dewey) {
-    const deweyClean = String(metadata.dewey).replace(/[^0-9.]/g, '');
-    if (deweyClean) {
-      const escaped = deweyClean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      if (new RegExp(`[A-Z]${escaped}`).test(text)) {
-        metadata.dewey = '';
-      }
+    const dewey = String(metadata.dewey).trim();
+    metadata.dewey = /^\d{3}(\.\d+)?$/.test(dewey) && metadata.subjects?.length ? dewey : null;
+    if (metadata.dewey) metadata.evidence.dewey = { source: 'Materias propuestas', quote: null, status: 'proposed' };
+  }
+  if (typeof metadata.notes === 'string' && metadata.notes.trim()) {
+    const normalize = value => String(value).replace(/\s+/g, ' ').trim();
+    const literal = metadata.notesKind === 'transcribed' && (opts.preserveSummary || normalize(rawText).includes(normalize(metadata.notes)));
+    if (literal) {
+      metadata.evidence.notes = { ...metadata.evidence.notes, quote: metadata.notes, status: 'observed' };
+    } else {
+      metadata.notesKind = 'generated';
+      metadata.notes = metadata.notes.trim().split(/\s+/).slice(0, 100).join(' ');
+      metadata.evidence.notes = { ...metadata.evidence.notes, quote: null, status: 'proposed' };
     }
   }
 

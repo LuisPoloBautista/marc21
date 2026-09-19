@@ -123,3 +123,5 @@ subcampo generado, la integracion lo omite y muestra un resumen.
 
 - La calidad del OCR depende de la nitidez de las imagenes y del modelo configurado.
 - La herramienta genera un registro preliminar. Un catalogador debe revisar puntos de acceso, materias, clasificaciones y descripcion fisica antes de importarlo a un ILS.
+
+Las reglas de copyright como año alternativo, resumen literal o generado (máximo 100 palabras) y Dewey propuesto se definen en [la política de catalogación](docs/skill_catalogacion_automatica_rda_llm.md). Las etiquetas de revisión se generan en código.
