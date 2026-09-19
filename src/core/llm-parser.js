@@ -65,15 +65,9 @@ export function cleanLlmOutput(metadata, rawText, opts = {}) {
     if (metadata.dewey) metadata.evidence.dewey = { source: 'Materias propuestas', quote: null, status: 'proposed' };
   }
   if (typeof metadata.notes === 'string' && metadata.notes.trim()) {
-    const normalize = value => String(value).replace(/\s+/g, ' ').trim();
-    const literal = metadata.notesKind === 'transcribed' && (opts.preserveSummary || normalize(rawText).includes(normalize(metadata.notes)));
-    if (literal) {
-      metadata.evidence.notes = { ...metadata.evidence.notes, quote: metadata.notes, status: 'observed' };
-    } else {
-      metadata.notesKind = 'generated';
-      metadata.notes = metadata.notes.trim().split(/\s+/).slice(0, 100).join(' ');
-      metadata.evidence.notes = { ...metadata.evidence.notes, quote: null, status: 'proposed' };
-    }
+    metadata.notesKind = 'generated';
+    metadata.notes = metadata.notes.trim().split(/\s+/).slice(0, 100).join(' ');
+    metadata.evidence.notes = { source: 'Evidencia del documento', quote: null, status: 'proposed' };
   }
 
   if (Array.isArray(metadata.author)) {

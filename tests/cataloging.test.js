@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { StructuringAgent } from '../src/agents/structuring-agent.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,13 +17,13 @@ test('finds evidence beyond initial pages and retains final scanned pages', () =
   assert.ok(selected.some(p => p.page === 100));
   assert.ok(selected.length <= 10);
   assert.equal(usableText(''), false);
-  assert.ok(selectEvidence(pages, 'book', selected.map(p=>p.page), /ISBN/).length === 0);
+
 });
-test('context budget retains evidence from the tenth image', () => {
-  const raw = Array.from({length:10},(_,i)=>`[Imagen ${i+1}]\n`+'Datos '.repeat(2000)).join('\n');
+test('context budget retains evidence from the tenth text page', () => {
+  const raw = Array.from({length:10},(_,i)=>`[Página ${i+1}]\n`+'Datos '.repeat(2000)).join('\n');
   const packed = compactEvidence(raw);
   assert.ok(packed.length <= 18000);
-  assert.ok(packed.includes('[Imagen 10]'));
+  assert.ok(packed.includes('[Página 10]'));
 });
 test('no invented dates, edition, extent, agency, thesaurus or classification', () => {
   const metadata = cleanLlmOutput({title:'Historia',author:[],subjects:['Historia'],pages:'xii, 126',year:null}, 'Copyright 1999. Segunda reimpresión. 300 p.', {pageCount:350,formatType:'thesis'});
@@ -48,6 +51,9 @@ test('preserves material-specific metadata and analytic pagination', () => {
 });
 test('API includes all OCR batches and verifies source-specific citations', async () => {
   const originalFetch = globalThis.fetch;
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'marc-api-test-'));
+  process.env.METRICS_FILE = path.join(temp, 'metrics.json');
+  process.env.LIBRARY_RECORD_LIMIT = '1';
   process.env.PORT = '0'; process.env.OPENAI_API_KEY = 'test-only';
   let calls = 0;
   globalThis.fetch = async (url, options) => {
@@ -61,39 +67,41 @@ test('API includes all OCR batches and verifies source-specific citations', asyn
       const labels = prompt.split('Imágenes en orden: ')[1];
       response = labels.split(', ').map(label=>label+'\nEditorial de prueba').join('\n');
     } else {
-      assert.ok(prompt.includes('[Imagen 10]'));
-      response = JSON.stringify({title:'Prueba',publisher:'Editorial de prueba',author:[],evidence:{publisher:{source:'Imagen 10',quote:'Editorial de prueba',status:'observed'},title:{source:'Imagen 1',quote:'Cita inventada',status:'observed'}}});
+      assert.ok(prompt.includes('[Imagen 5]'));
+      response = JSON.stringify({title:'Prueba',publisher:'Editorial de prueba',author:[],evidence:{publisher:{source:'Imagen 5',quote:'Editorial de prueba',status:'observed'},title:{source:'Imagen 1',quote:'Cita inventada',status:'observed'}}});
     }
-    return new Response(JSON.stringify({output_text:response}),{status:200});
+    return new Response(JSON.stringify({output_text:response,usage:{input_tokens:100,output_tokens:20,input_tokens_details:{cached_tokens:10}}}),{status:200});
   };
   const {server} = await import('../server.js');
   try {
     if (!server.listening) await new Promise(resolve=>server.once('listening',resolve));
-    const response = await originalFetch(`http://127.0.0.1:${server.address().port}/api/extract-metadata`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({format:'book',images:Array.from({length:10},(_,i)=>({label:`Imagen ${i+1}`,data:'aGVsbG8='}))})});
+    const response = await originalFetch(`http://127.0.0.1:${server.address().port}/api/extract-metadata`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({format:'book',images:Array.from({length:5},(_,i)=>({label:`Imagen ${i+1}`,data:'aGVsbG8='}))})});
     const result = await response.json();
     assert.equal(response.status,200,JSON.stringify(result));
-    assert.equal(calls,5);
+    assert.equal(calls,3);
     assert.equal(result.source.evidence.publisher.verified,true);
     assert.equal(result.source.evidence.title.verified,false);
-    globalThis.fetch = async () => new Response(JSON.stringify({output_text:'{"year":null,"evidence":{}}'}), {status:200});
-    const follow = await originalFetch(`http://127.0.0.1:${server.address().port}/api/extract-metadata`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:'[Página 20] Sin fecha',format:'book',previous:result.source,missing:['year']})});
-    const preserved = await follow.json();
-    assert.equal(follow.status,200);
-    assert.equal(preserved.source.title,'Prueba');
-    assert.equal(preserved.source.publisher,'Editorial de prueba');
-    assert.equal(preserved.source.evidence.publisher.verified,true);
-    assert.equal(preserved.warnings.length,1);
-  } finally { globalThis.fetch=originalFetch; await new Promise(resolve=>server.close(resolve)); }
+    assert.equal(result.metrics.completed,1);
+    assert.equal(result.metrics.inputTokens,300);
+    assert.equal(result.metrics.outputTokens,60);
+    assert.equal(result.metrics.cachedTokens,30);
+    assert.match(result.result['883'].u,/^urn:uuid:/);
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const send = (endpoint, body) => originalFetch(base+endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const reformatted = await send('/api/format',{source:result.source});
+    assert.deepEqual((await reformatted.json()).result['883'],result.result['883']);
+    assert.equal((await send('/api/extract-metadata',{text:'Nuevo libro'})).status,429);
+    assert.equal((await send('/api/extract-metadata',{text:'Libro',images:Array.from({length:6},()=>({data:'x'}))})).status,400);
+    assert.equal((await send('/api/extract-metadata',{text:'Libro',previous:result.source,missing:['year']})).status,400);
+    assert.equal((await send('/api/ocr',{images:[{data:'x'}]})).status,410);
+    const snapshot = await (await originalFetch(base+'/api/metrics')).json();
+    assert.equal(snapshot.completed,1);
+    assert.equal(snapshot.totalTokens,360);
+    assert.equal(snapshot.remaining,0);
+    assert.equal(calls,3);
+  } finally { globalThis.fetch=originalFetch; await new Promise(resolve=>server.close(resolve)); fs.rmSync(temp,{recursive:true,force:true}); }
 });
 
-test('targeted search accepts missing values without retries', async () => {
-  let calls = 0;
-  const agent = new StructuringAgent({generate: async () => { calls++; return {response:'{"year":null,"evidence":{}}'}; }});
-  const result = await agent.structure('Nueva página sin fecha de publicación', {missing:['year']});
-  assert.equal(result.empty, true);
-  assert.equal(result.metadata.year, null);
-  assert.equal(calls, 1);
-});
 test('initial search without evidence reports actionable error without repeated costs', async () => {
   let calls = 0;
   const agent = new StructuringAgent({generate: async () => { calls++; return {response:'{"title":null,"author":[],"evidence":{}}'}; }});
@@ -116,16 +124,16 @@ test('copyright year fills missing year without replacing publication year', () 
   assert.equal(fallback.evidence.year.basis,'copyright');
   assert.equal(cleanLlmOutput({...source,year:'2023'},'').year,'2023');
 });
-test('generated summaries have strict 100 word cap; literal abstracts stay intact including MARC and cache', () => {
+test('all summaries have strict 100 word cap even with an abstract', () => {
   const long = Array.from({length:140},(_,i)=>`word${i}`).join(' ');
   const generated = cleanLlmOutput({notes:long,notesKind:'generated'},'');
   assert.equal(generated.notes.split(/\s+/).length,100);
   assert.equal(generated.evidence.notes.status,'proposed');
   const original = cleanLlmOutput({notes:long,notesKind:'transcribed',evidence:{notes:{source:'Página 1'}}},'Abstract\n'+long);
-  assert.equal(original.notes,long);
-  assert.equal(original.evidence.notes.quote,long);
-  assert.equal(buildMarcRecord(original)['520'].a,long);
-  assert.equal(cleanLlmOutput(original,'',{preserveSummary:true}).notes,long);
+  assert.equal(original.notes.split(/\s+/).length,100);
+  assert.equal(original.evidence.notes.quote,null);
+  assert.equal(original.notesKind,'generated');
+  assert.equal(buildMarcRecord(original)['520'].a,original.notes);
 });
 test('Dewey is a subject-based proposal; LC is removed from metadata and MARC', () => {
   const meta = cleanLlmOutput({subjects:['Educación'],dewey:'370',lcClassification:'LB'},'');

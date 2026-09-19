@@ -14,6 +14,6 @@ Conservar páginas impresas y numeración preliminar; artículos/capítulos usan
 
 Roles admitidos: autor, coordinador, compilador, editor, traductor, prologuista, ilustrador, asesor. Mantener roles explícitos y revisar la elección del punto de acceso principal. Las materias son propuestas automáticas; no se declaran autorizadas. Solo se genera 082: Dewey propuesto a partir de las materias y sujeto a revisión. No se genera 050 (LC).
 
-Segunda búsqueda: título y año; editorial en libros/memorias; contenedor en artículos/capítulos; institución y grado en tesis. El resto de ausencias se muestra para revisión, evitando llamadas adicionales sin fin.
+Sin segunda búsqueda: todas las ausencias quedan para revisión manual.
 
-Las reglas de copyright como año alternativo, resumen literal o generado (máximo 100 palabras) y Dewey propuesto se definen en [la política de catalogación](skill_catalogacion_automatica_rda_llm.md). Las etiquetas de revisión se generan en código.
+Las reglas de copyright como año alternativo, resumen siempre generado (máximo 100 palabras) y Dewey propuesto se definen en [la política de catalogación](skill_catalogacion_automatica_rda_llm.md). Las etiquetas de revisión se generan en código.

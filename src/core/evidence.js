@@ -18,17 +18,17 @@ export function reduceText(text, limit = 2600) {
     return inSummary || i < 12 || /ISBN|ISSN|copyright|©|edici[oó]n|edition|editorial|publisher|serie|colof[oó]n|10\.\d{4,9}/i.test(s); });
   return useful.join('\n').slice(0, limit);
 }
-export function selectEvidence(pages, format = 'book', excluded = [], terms = null) {
+export function selectEvidence(pages, format = 'book') {
   const total = pages.length;
   let budget = MAX_EVIDENCE_CHARS;
   const seen = new Set();
-  return pages.filter(p => !excluded.includes(p.page))
+  return pages
     .map(p => ({ ...p, score: scorePage(p, total, format) }))
-    .filter(p => p.score > 0 && (!terms || terms.test(p.text)))
+    .filter(p => p.score > 0)
     .sort((a, b) => b.score - a.score || a.page - b.page)
     .filter(p => { const key = p.text.trim(); if (!key) return true; if (seen.has(key)) return false; seen.add(key); return true; })
-    .slice(0, terms ? 3 : 10)
-    .map(p => { const text = reduceText(p.text, Math.min(/\b(?:abstract|resumen)\b/i.test(p.text) ? 8000 : 2600, budget)); budget -= text.length; return { ...p, text }; })
+    .slice(0, 10)
+    .map(p => { const text = reduceText(p.text, Math.min(2600, budget)); budget -= text.length; return { ...p, text }; })
     .filter(p => p.text || !usableText(pages.find(o => o.page === p.page)?.text));
 }
 export function evidenceText(pages) {

@@ -794,3 +794,13 @@ button:hover {
 .verification-table th { position: sticky; top: 0; }
 .verification-table td { max-width: 290px; overflow-wrap: anywhere; }
 .verification-table tbody tr:nth-child(even) { background: #f8fafc; }
+
+.metrics-panel { border: 1px solid #dbe3ed; border-radius: 10px; margin: 18px 0; background: #fff; }
+.metrics-panel summary { padding: 16px; cursor: pointer; font-weight: 600; }
+.metrics-content { padding: 0 16px 16px; }
+.metrics-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap: 12px; }
+.metrics-grid > div { background: #f8fafc; border-radius: 8px; padding: 14px; }
+.metrics-grid span { display: block; color: #64748b; font-size: 13px; }
+.metrics-grid strong { display: block; font-size: 26px; margin-top: 6px; }
+#metricsQuota { width: 100%; accent-color: #f1652f; }
+#metricsStatus, #metricsTokenDetail, #metricsLimit { font-size: 13px; }

@@ -14,3 +14,7 @@ services:
         sync: false
       - key: ALLOWED_ORIGINS
         value: "*"
+      - key: LIBRARY_ID
+        value: demo
+      - key: LIBRARY_NAME
+        value: Biblioteca demo

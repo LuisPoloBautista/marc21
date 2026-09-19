@@ -17,13 +17,12 @@ export class StructuringAgent {
     const formatType = opts.formatType || 'book';
     const pageCount = opts.pageCount;
     const fields = [...COMMON_FIELDS, ...(TYPE_FIELDS[formatType] || TYPE_FIELDS.book)];
-    const targeted = Array.isArray(opts.missing) && opts.missing.length > 0;
 
     if (!rawText || !rawText.trim()) {
       throw new Error('No text provided for structuring');
     }
 
-    const prompt = buildStructuringPrompt(rawText, catLang, formatType, opts.missing);
+    const prompt = buildStructuringPrompt(rawText, catLang, formatType);
     let lastError = null;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -56,7 +55,7 @@ export class StructuringAgent {
           const value = cleaned[key];
           return typeof value === 'string' ? Boolean(value.trim()) : Array.isArray(value) && value.some(v => typeof v === 'string' && v.trim());
         });
-        if (!hasData && !targeted) {
+        if (!hasData) {
           lastError = new Error('No se encontraron datos bibliográficos en la evidencia seleccionada. Añade la portada o la página legal con texto legible y vuelve a generar.');
           lastError.code = 'NO_BIBLIOGRAPHIC_EVIDENCE';
           break;

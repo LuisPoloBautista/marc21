@@ -91,7 +91,7 @@ let loadingImages = false;
 async function addImages(files) {
   if (loadingImages) return;
   const valid = [...files].filter(f => f.type.startsWith('image/'));
-  if (uploadedImages.length + valid.length > 10) { alert('Puedes subir hasta 10 imágenes. Elimina alguna antes de agregar más.'); return; }
+  if (uploadedImages.length + valid.length > 5) { alert('Puedes subir hasta 5 imágenes. Elimina alguna antes de agregar más.'); return; }
   loadingImages = true;
   generateBtn.disabled = true;
   try {
@@ -107,7 +107,7 @@ async function addImages(files) {
 function renderImages() {
   const list = document.getElementById('imageList');
   list.replaceChildren();
-  document.getElementById('imageCount').textContent = `${uploadedImages.length}/10 imágenes`;
+  document.getElementById('imageCount').textContent = `${uploadedImages.length}/5 imágenes`;
   uploadedImages.forEach((item, index) => {
     const card = document.createElement('div');
     const img = document.createElement('img');
@@ -148,13 +148,13 @@ async function renderPdfPageAsImage(pdf, pageNum, scale = 2) {
   return canvas.toDataURL('image/jpeg', 0.85);
 }
 
-async function prepareEvidence(excluded = [], terms = null) {
-  const selected = selectEvidence(pdfPages, getSelectedFormat(), excluded, terms);
+async function prepareEvidence() {
+  const selected = selectEvidence(pdfPages, getSelectedFormat());
   const images = [];
   const textPages = [];
   for (const page of selected) {
     if (usableText(page.text)) textPages.push(page);
-    else {
+    else if (images.length < 5) {
       const data = (await renderPdfPageAsImage(pdfDocument, page.page, 1.5)).split(',')[1];
       images.push({ page: page.page, label: `Página ${page.page}`, data });
     }
@@ -211,7 +211,7 @@ async function generateMarc() {
   const agency = '';
   const catLang = 'spa';
 
-  const imagesPayload = [...pdfImages, ...uploadedImages.map((i, n) => ({ label: `Imagen ${n + 1}`, data: i.data }))];
+  const imagesPayload = [...uploadedImages.map((i, n) => ({ label: `Imagen ${n + 1}`, data: i.data })), ...pdfImages.slice(0, 5 - uploadedImages.length)];
 
   const requestRevision = inputRevision;
   const requestKey = JSON.stringify({ text, format, images: imagesPayload });
@@ -266,24 +266,6 @@ async function generateMarc() {
       else { setProgress(50); setStage('structure', 'active'); }
 
       const data = await res.json();
-      // One targeted pass, only new evidence, when essential fields remain missing.
-      const required = ['title', 'year', ...(format === 'thesis' ? ['institution','degree'] : format === 'article' || format === 'chapter' ? ['hostTitle'] : ['publisher'])];
-      const missing = required.filter(k => !data.source[k]);
-      if (missing.length && pdfDocument) {
-        try {
-        const patterns = { title: /./, year: /copyright|©|public|edici[oó]n|\b(?:19|20)\d{2}\b/i, publisher: /editorial|publisher|publicado|published/i, institution: /universidad|institut/i, degree: /grado|tesis|thesis/i, hostTitle: /revista|journal|ISBN|ISSN/i };
-        const terms = new RegExp(missing.map(k => patterns[k].source).join('|'), 'i');
-        const extra = await prepareEvidence(selectedPages, terms);
-        if (extra.text || extra.images.length) {
-          const follow = await apiFetch('/api/extract-metadata', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: extra.text, images: extra.images, format, previous: data.source, missing }) });
-          if (!follow.ok) throw new Error((await follow.json()).error);
-          const updated = await follow.json();
-          Object.assign(data, updated);
-        }
-        } catch (error) {
-          data.warnings = ['No se pudo completar la búsqueda adicional. Se conserva la descripción inicial para revisión. Detalle: ' + error.message];
-        }
-      }
       if (requestRevision !== inputRevision) throw new Error("Los datos cambiaron durante el análisis. Genera el registro de nuevo.");
       marcData = data.result;
       sourceData = data.source;
@@ -295,15 +277,6 @@ async function generateMarc() {
       setStage('build', 'active');
 
       renderVerification(sourceData);
-      let warning = document.getElementById('extractionWarning');
-      if (!warning) {
-        warning = document.createElement('p');
-        warning.id = 'extractionWarning';
-        warning.setAttribute('role', 'status');
-        document.getElementById('verificationBlock').prepend(warning);
-      }
-      warning.textContent = (data.warnings || []).join(' ');
-      warning.hidden = !warning.textContent;
       document.getElementById('verificationBlock').style.display = 'block';
 
       setProgress(100);
@@ -322,7 +295,7 @@ async function generateMarc() {
     setStage('structure', '');
     setStage('build', '');
     setProgress(0);
-  }
+  } finally { await refreshMetrics(); }
 }
 
 function subfieldSort(a, b) {
@@ -540,7 +513,7 @@ function downloadMarc() {
   if (marcData['005']) xml += `  <controlfield tag="005">${escapeXml(marcData['005'])}</controlfield>\n`;
   if (marcData['008']) xml += `  <controlfield tag="008">${escapeXml(marcData['008'])}</controlfield>\n`;
 
-  const dataFields = ['020', '022', '024', '040', '041', '050', '082', '100', '111', '245', '250', '260', '264', '300', '336', '337', '338', '490', '500', '502', '504', '520', '600', '648', '650', '700', '710', '711', '773', '856'];
+  const dataFields = ['020', '022', '024', '040', '041', '050', '082', '100', '111', '245', '250', '260', '264', '300', '336', '337', '338', '490', '500', '502', '504', '520', '600', '648', '650', '700', '710', '711', '773', '856', '883'];
 
   for (const tag of dataFields) {
     if (marcData[tag]) {
@@ -571,7 +544,7 @@ function importMarcIntoKoha() {
     const editor = document.getElementById("marcEditor");
     if (editor) {
       try {
-        marcData = parseRawMarc(editor.value);
+        marcData = { ...parseRawMarc(editor.value), ...(marcData['883'] ? { '883': { ...marcData['883'], ind1: '1' } } : {}) };
       } catch (error) {
         alert("No se puede importar: revisa el formato del registro editado.");
         return;
@@ -609,7 +582,7 @@ function toggleEditMode() {
     const editor = document.getElementById("marcEditor");
     const rawText = editor.value;
     try {
-      marcData = parseRawMarc(rawText);
+      marcData = { ...parseRawMarc(rawText), ...(marcData['883'] ? { '883': { ...marcData['883'], ind1: '1' } } : {}) };
       renderMarc(marcData);
       editBtn.textContent = "Editar";
     } catch (e) {
@@ -786,3 +759,34 @@ textInput.addEventListener("input", () => {
     document.getElementById('verificationBlock').style.display = 'none';
   }
 });
+
+async function refreshMetrics() {
+  const status = document.getElementById('metricsStatus');
+  try {
+    const response = await apiFetch('/api/metrics');
+    if (!response.ok) throw new Error('No se pudieron cargar las métricas');
+    const data = await response.json();
+    const number = value => Number(value || 0).toLocaleString('es-MX');
+    document.getElementById('metricsLibrary').textContent = data.libraryName;
+    document.getElementById('metricsStorage').textContent = data.storage === 'local-demo' ? 'Demo: historial en archivo local del servidor. En Render sin disco persistente se pierde al reiniciar o desplegar.' : 'Historial en la ruta configurada del servidor. Su permanencia depende del almacenamiento contratado.';
+    document.getElementById('metricsCompleted').textContent = number(data.completed);
+    document.getElementById('metricsBooks').textContent = number(data.byType.book);
+    document.getElementById('metricsTokens').textContent = number(data.totalTokens);
+    document.getElementById('metricsTokenDetail').textContent = `Entrada: ${number(data.inputTokens)} · Salida: ${number(data.outputTokens)} · Entrada en caché: ${number(data.cachedTokens)}`;
+    document.getElementById('metricsLimit').textContent = data.limit === null ? 'Sin límite configurado' : `${number(data.completed)} / ${number(data.limit)} registros · ${number(data.remaining)} disponibles`;
+    const progress = document.getElementById('metricsQuota');
+    progress.max = data.limit || 1; progress.value = data.limit === null ? 0 : Math.min(data.completed, data.limit || 1);
+    progress.hidden = data.limit === null;
+    status.textContent = `${number(data.failed)} fallidos · ${number(data.inProgress)} en proceso · ${number(data.calls)} llamadas. ${data.unreportedCalls ? number(data.unreportedCalls) + ' llamadas sin uso reportado; total de tokens parcial.' : 'Tokens reportados por la API.'}`;
+    const list = document.getElementById('metricsRecent'); list.replaceChildren();
+    for (const item of data.recent.slice(0,10)) {
+      const row = document.createElement('tr');
+      for (const value of [new Date(item.date).toLocaleString('es-MX'), item.format, item.status === 'completed' ? 'Generado' : 'Fallido', number(item.inputTokens+item.outputTokens), item.id]) {
+        const cell = document.createElement('td'); cell.textContent = value; row.append(cell);
+      }
+      list.append(row);
+    }
+  } catch (error) { status.textContent = error.message; }
+}
+document.getElementById('refreshMetrics').addEventListener('click', refreshMetrics);
+refreshMetrics();

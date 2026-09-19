@@ -75,6 +75,29 @@
           </div>
         </div>
 
+        <details class="metrics-panel" id="metricsPanel">
+          <summary>Panel de métricas · <span id="metricsLibrary">Demo</span></summary>
+          <div class="metrics-content">
+            <div class="metrics-grid">
+              <div><span>Registros generados</span><strong id="metricsCompleted">—</strong></div>
+              <div><span>Libros generados</span><strong id="metricsBooks">—</strong></div>
+              <div><span>Tokens reportados</span><strong id="metricsTokens">—</strong></div>
+            </div>
+            <p id="metricsTokenDetail"></p>
+            <p id="metricsLimit">Consultando cuota…</p>
+            <progress id="metricsQuota" max="1" value="0" aria-label="Uso de la cuota" hidden></progress>
+            <p id="metricsStatus" role="status"></p>
+            <p class="upload-help">La cuota cuenta generaciones exitosas de todos los materiales, no registros guardados en Koha ni títulos únicos. Reutilizar el resultado en caché no consume otra unidad. Los tokens incluyen reintentos y solicitudes fallidas con uso reportado.</p>
+            <p id="metricsStorage" class="upload-help"></p>
+            <button type="button" id="refreshMetrics" class="btn-secondary">Actualizar métricas</button>
+            <div class="verification-scroll"><table class="verification-table">
+              <caption>Últimas generaciones</caption>
+              <thead><tr><th>Fecha</th><th>Material</th><th>Estado</th><th>Tokens</th><th>ID de seguimiento</th></tr></thead>
+              <tbody id="metricsRecent"></tbody>
+            </table></div>
+          </div>
+        </details>
+
         <div class="catalog-row">
           <div class="cat-col">
             <label class="label-header">1. Sube un PDF</label>
@@ -88,10 +111,10 @@
           </div>
           <div class="cat-col">
             <label class="label-header">2. Sube imágenes</label>
-            <p class="upload-help">Hasta 10 imágenes del mismo recurso: portada, página legal, índice o colofón. Se analizan como páginas de un documento.</p>
+            <p class="upload-help">Hasta 5 imágenes del mismo recurso: portada, página legal, índice o colofón. Se analizan como páginas de un documento.</p>
             <input type="file" id="imageInput" accept="image/*" multiple hidden>
             <button type="button" id="imageDrop" class="drop-zone">Arrastra imágenes o haz clic para seleccionarlas</button>
-            <p id="imageCount" aria-live="polite">0/10 imágenes</p>
+            <p id="imageCount" aria-live="polite">0/5 imágenes</p>
             <div id="imageList" class="image-list"></div>
           </div>
           <div class="cat-col">
@@ -151,7 +174,7 @@
           </summary>
           <div class="info-section-content">
             <p>La descripción se redacta en español; el idioma del recurso se identifica a partir de la evidencia. El total de páginas del PDF es un dato técnico, no la extensión bibliográfica. Las materias se muestran como propuestas automáticas (sin $2 de un tesauro no consultado).</p>
-            <p>Se conserva el Abstract o Resumen visible sin traducirlo. Si no aparece, se genera uno de máximo 100 palabras. El año puede proceder del copyright cuando falta la fecha de publicación; su fuente se indica en la tabla.</p>
+            <p>Siempre se genera un resumen breve de máximo 100 palabras a partir de la evidencia, incluyendo Abstract/Resumen si existe. El año puede proceder del copyright cuando falta la fecha de publicación; su fuente se indica en la tabla.</p>
             <p><strong>Aspectos fuera del alcance</strong></p>
             <ul>
               <li>No crea puntos de acceso autorizados.</li>
@@ -190,10 +213,10 @@
       <div class="sidebar-inner">
       <div class="sidebar-card">
         <h3><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#f1652f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg> ¿Cómo funciona?</h3>
-        <div class="step"><div class="step-num">1</div><div class="step-text">Selecciona el tipo y sube un PDF o hasta 10 imágenes del mismo recurso. Puedes agregar texto complementario.</div></div>
+        <div class="step"><div class="step-num">1</div><div class="step-text">Selecciona el tipo y sube un PDF o hasta 5 imágenes del mismo recurso. Puedes agregar texto complementario.</div></div>
         <div class="step"><div class="step-num">2</div><div class="step-text"><strong>Evidencia:</strong> extracción local de texto y selección de páginas; OCR solo en imágenes y páginas sin texto utilizable.</div></div>
         <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Estructuración:</strong> un modelo OpenAI interpreta el texto y lo estructura en metadatos MARC21 según reglas RDA.</div></div>
-        <div class="step"><div class="step-num">4</div><div class="step-text">Una segunda búsqueda dirigida intenta completar los datos esenciales faltantes. Las reglas locales construyen el borrador MARC21.</div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-text">Se realiza una única extracción sobre la evidencia seleccionada. Los datos faltantes quedan pendientes de revisión.</div></div>
         <div class="step"><div class="step-num">5</div><div class="step-text">Revisa, edita y descarga el registro en formato MARCXML para importar en Koha u otros ILS.</div></div>
       </div>
 
@@ -204,9 +227,9 @@
           <li>Libros: ventana inicial de 10 primeras y 3 últimas páginas; artículos: primeras 2 y última. Se buscan señales en el resto del texto.</li>
           <li>Hasta 10 páginas candidatas por selección, con bloques deduplicados y presupuesto de 18 000 caracteres de evidencia.</li>
           <li>OCR solo cuando hace falta. Las imágenes conservan su número de carga; las páginas PDF, su número físico.</li>
-          <li>Una segunda búsqueda dirigida incorpora hasta 3 páginas nuevas cuando faltan datos esenciales y hay texto local que permite localizarlas.</li>
+          <li>Sin segunda búsqueda. Hasta 5 imágenes en total por generación; si se combinan archivos, las imágenes cargadas tienen prioridad sobre las páginas PDF que necesitan OCR.</li>
         </ul>
-        <p>En PDF escaneados sin texto, la búsqueda fuera de la selección inicial requiere aportar imágenes de las páginas faltantes. Repetir una generación sin cambios reutiliza el resultado.</p>
+        <p>En PDF escaneados sin texto, la búsqueda fuera de la selección inicial requiere aportar imágenes de las páginas faltantes. Repetir una generación sin cambios reutiliza el resultado sin descontar otra unidad de cuota.</p>
       </div>
 
       <div class="sidebar-card">

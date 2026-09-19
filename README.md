@@ -78,9 +78,9 @@ ALLOWED_ORIGINS="https://usuario.github.io"
 ## Flujo de uso
 
 1. Selecciona el tipo: libro, capítulo, artículo, tesis o memorias.
-2. Sube un PDF o hasta 10 imágenes en una sola zona. Puedes agregar texto complementario del mismo recurso.
+2. Sube un PDF o hasta 5 imágenes en una sola zona. Puedes agregar texto complementario del mismo recurso.
 3. El PDF se lee localmente: se seleccionan páginas relevantes y solo se aplica OCR donde no hay texto utilizable.
-4. El modelo estructura evidencia breve; una segunda búsqueda dirigida intenta completar datos esenciales con páginas nuevas.
+4. El modelo estructura evidencia breve; se realiza una sola pasada y se genera un resumen breve de máximo 100 palabras.
 5. Revisa valores, fuentes, citas y propuestas automáticas. Edita y descarga MARCXML o importa al formulario de Koha.
 
 La interfaz ya no solicita agencia ni idioma de catalogación. Se describe en español y se conserva el idioma observado del recurso. `CATALOGING_AGENCY` permite configurar en Render el código institucional de 040; si está vacío se omiten $a/$c.
@@ -124,4 +124,9 @@ subcampo generado, la integracion lo omite y muestra un resumen.
 - La calidad del OCR depende de la nitidez de las imagenes y del modelo configurado.
 - La herramienta genera un registro preliminar. Un catalogador debe revisar puntos de acceso, materias, clasificaciones y descripcion fisica antes de importarlo a un ILS.
 
-Las reglas de copyright como año alternativo, resumen literal o generado (máximo 100 palabras) y Dewey propuesto se definen en [la política de catalogación](docs/skill_catalogacion_automatica_rda_llm.md). Las etiquetas de revisión se generan en código.
+Las reglas de copyright como año alternativo, resumen siempre generado (máximo 100 palabras) y Dewey propuesto se definen en [la política de catalogación](docs/skill_catalogacion_automatica_rda_llm.md). Las etiquetas de revisión se generan en código.
+
+## Panel de métricas y cuota
+El demo no tiene límite. El panel muestra registros generados, libros, tokens de entrada/salida, cuota e historial reciente. Cada despliegue representa una biblioteca y tiene su propio enlace. Configura `LIBRARY_ID`, `LIBRARY_NAME` y opcionalmente `LIBRARY_RECORD_LIMIT` para un límite acumulado de registros. No hay cobro automático ni límite por tokens.
+La marca 883 se conserva en MARCXML y en el envío a Koha, oculta en la vista habitual del asistente. Habilita sus subcampos en el framework Koha para conservarla.
+Consulta [métricas y trazabilidad](docs/metrics-and-tracking.md) para las reglas de conteo, almacenamiento persistente y configuración. En Render gratuito el archivo de métricas es efímero; para conservar el historial usa un disco persistente y `METRICS_FILE`.

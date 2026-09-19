@@ -1,3 +1,4 @@
+import { reportUsage } from './metrics.js';
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 
 function createTimeoutSignal(signal, timeoutMs) {
@@ -48,6 +49,7 @@ export class OpenAiClient {
       });
     }
 
+    let usageReported = false;
     try {
       const response = await fetch(OPENAI_RESPONSES_URL, {
         method: 'POST',
@@ -65,6 +67,8 @@ export class OpenAiClient {
       });
 
       const data = await response.json().catch(() => ({}));
+      reportUsage(data.usage);
+      usageReported = true;
       if (!response.ok) {
         const message = data.error?.message || `OpenAI request failed with status ${response.status}`;
         throw new Error(message);
@@ -72,6 +76,7 @@ export class OpenAiClient {
 
       return { response: extractOutputText(data), raw: data };
     } finally {
+      if (!usageReported) reportUsage(null);
       timeout.clear();
     }
   }

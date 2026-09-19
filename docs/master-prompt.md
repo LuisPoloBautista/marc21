@@ -14,4 +14,4 @@ Ejemplo parcial:
 
 El presupuesto de evidencia es 18 000 caracteres, no una cifra exacta de tokens. El esquema por tipo, la selección local y la caché evitan envíos y campos innecesarios. El consumo real depende del texto, las imágenes, el modelo y los reintentos.
 
-Las reglas de copyright como año alternativo, resumen literal o generado (máximo 100 palabras) y Dewey propuesto se definen en [la política de catalogación](skill_catalogacion_automatica_rda_llm.md). Las etiquetas de revisión se generan en código.
+Las reglas de copyright como año alternativo, resumen siempre generado (máximo 100 palabras) y Dewey propuesto se definen en [la política de catalogación](skill_catalogacion_automatica_rda_llm.md). Las etiquetas de revisión se generan en código.
