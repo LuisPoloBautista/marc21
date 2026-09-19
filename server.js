@@ -1,4 +1,5 @@
 import express from 'express';
+import { MAX_EVIDENCE_CHARS, compactEvidence } from './src/core/evidence.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -61,34 +62,39 @@ app.post('/api/extract-metadata', async (req, res) => {
     const text = cleanExtractedText(rawText || '');
     const imgs = Array.isArray(images) ? images.filter(i => i.data) : [];
 
-    let ocrResult = null;
-
-    if (imgs.length > 0) {
-      const batchSize = 3;
-      const batches = [];
-      for (let i = 0; i < imgs.length; i += batchSize) {
-        batches.push(imgs.slice(i, i + batchSize));
+    if (imgs.filter(i => Number.isInteger(i.page)).length > 10 || imgs.filter(i => !Number.isInteger(i.page)).length > 10) return res.status(400).json({ error: 'Máximo 10 imágenes adjuntas y 10 páginas PDF candidatas por solicitud.' });
+    let sourceText = text.includes('[') ? text : '[Texto aportado]\n' + text;
+    for (let i = 0; i < imgs.length; i += 3) {
+      const batch = imgs.slice(i, i + 3);
+      const ocr = await ocrAgent.process(batch, 'spa');
+      sourceText += '\n\n' + ocr.rawText;
+    }
+    sourceText = compactEvidence(sourceText);
+    const structured = await structuringAgent.structure(sourceText, {
+      catLang: 'spa', formatType: formatType || 'book', pageCount, missing: req.body.missing || []
+    });
+    // A literal quote is checked in its claimed source, never inferred from fuzzy word matches.
+    const normalize = value => String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const segments = [...sourceText.matchAll(/\[([^\]\n]+)\]\s*([^]*?)(?=\[[^\]\n]+\]|$)/g)];
+    for (const ev of Object.values(structured.metadata.evidence || {})) {
+      if (!ev || typeof ev !== 'object') continue;
+      const segment = segments.find(m => normalize(m[1]) === normalize(ev.source));
+      ev.verified = ev.status === 'observed' && normalize(ev.quote).length >= 4 && !!segment && normalize(segment[2]).includes(normalize(ev.quote));
+    }
+    if (req.body.previous && Array.isArray(req.body.missing)) {
+      const previous = req.body.previous;
+      const fresh = structured.metadata;
+      const merged = { ...previous, evidence: { ...(previous.evidence || {}) } };
+      for (const key of req.body.missing.filter(k => Object.hasOwn(fresh, k) && !['__proto__','constructor','prototype','evidence'].includes(k))) {
+        if (fresh[key]) { merged[key] = fresh[key]; merged.evidence[key] = fresh.evidence?.[key]; }
       }
-
-      let combinedText = text;
-      for (const batch of batches) {
-        const result = await ocrAgent.process(batch, catLang || 'spa', combinedText);
-        combinedText = result.rawText;
-        if (!ocrResult) ocrResult = result;
-      }
+      structured.metadata = merged;
     }
 
-    const sourceText = ocrResult ? ocrResult.rawText : text;
-    const structured = await structuringAgent.structure(sourceText, {
-      catLang: catLang || 'spa',
-      formatType: formatType || 'book',
-      pageCount
-    });
-
     const result = buildMarcRecord(structured.metadata, {
-      agency: agency || 'IGN',
+      agency: process.env.CATALOGING_AGENCY || '',
       formatType: formatType || 'book',
-      catLang: catLang || 'spa',
+      catLang: 'spa',
       pageCount
     });
 
@@ -109,9 +115,9 @@ app.post('/api/format', (req, res) => {
     const cleaned = cleanLlmOutput(validated, text || '', { pageCount, formatType });
 
     const result = buildMarcRecord(cleaned, {
-      agency: agency || 'IGN',
+      agency: process.env.CATALOGING_AGENCY || '',
       formatType: formatType || 'book',
-      catLang: catLang || 'spa',
+      catLang: 'spa',
       pageCount
     });
     res.json({ result });
@@ -128,7 +134,8 @@ app.post('/api/ocr', async (req, res) => {
       return res.status(400).json({ error: 'Images are required' });
     }
 
-    const result = await ocrAgent.process(images, catLang || 'spa');
+    if (!Array.isArray(images) || images.length > 10) return res.status(400).json({ error: 'Máximo 10 imágenes.' });
+    const result = await ocrAgent.process(images, 'spa');
     res.json({ text: result.rawText, source: result.source });
   } catch (error) {
     console.error('Error in /api/ocr:', error);
@@ -142,7 +149,7 @@ app.post('/api/structure', async (req, res) => {
     if (!text) return res.status(400).json({ error: 'Text is required' });
 
     const result = await structuringAgent.structure(text, {
-      catLang: catLang || 'spa',
+      catLang: 'spa',
       formatType: formatType || 'book',
       pageCount
     });
@@ -153,7 +160,7 @@ app.post('/api/structure', async (req, res) => {
   }
 });
 
-const server = app.listen(PORT, () => {
+export const server = app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);
   console.log(`  OpenAI OCR Agent: ${process.env.OPENAI_OCR_MODEL || DEFAULT_OPENAI_MODEL}`);
   console.log(`  OpenAI Structuring Agent: ${process.env.OPENAI_STRUCTURING_MODEL || DEFAULT_OPENAI_MODEL}`);

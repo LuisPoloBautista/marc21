@@ -77,11 +77,11 @@ export function detectDates(yearStr) {
     }
   }
   const single = yearStr.replace(/[^0-9]/g, '').slice(0, 4);
-  return { type: 's', date1: single.padStart(4, '0'), date2: '    ' };
+  return { type: 's', date1: single.length === 4 ? single : 'uuuu', date2: '    ' };
 }
 
 export function detectCountry(place) {
-  if (!place) return 'mx ';
+  if (!place) return 'xx ';
   const p = place.toLowerCase();
   if (p.includes('méxico') || p.includes('mexico') || p.includes('cdmx') || p.includes('ciudad de méxico') || p.includes('ciudad de mexico')) return 'mx ';
   if (p.includes('españa') || p.includes('spain') || p.includes('madrid')) return 'sp ';
@@ -92,7 +92,7 @@ export function detectCountry(place) {
   if (p.includes('argentina') || p.includes('buenos aires')) return 'ag ';
   if (p.includes('colombia') || p.includes('bogotá')) return 'ck ';
   if (p.includes('estados unidos') || p.includes('eeuu') || p.includes('usa') || p.includes('united states') || p.includes('new york')) return 'xxu';
-  return 'mx ';
+  return 'xx ';
 }
 
 export function splitTitle(title) {

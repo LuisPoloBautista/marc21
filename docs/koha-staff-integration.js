@@ -5,6 +5,8 @@
 (function () {
   "use strict";
 
+  function initializeMarc21Assistant() {
+
   const ASSISTANT_ORIGIN = "https://marc21.onrender.com";
   const ASSISTANT_URL = ASSISTANT_ORIGIN + "/?koha=1";
   const CATALOGUING_PATH = "/cgi-bin/koha/cataloguing/addbiblio.pl";
@@ -165,4 +167,12 @@
       catch (error) { window.alert("No se pudo importar el registro: " + error.message); }
     }
   });
+
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initializeMarc21Assistant, { once: true });
+  } else {
+    initializeMarc21Assistant();
+  }
 }());

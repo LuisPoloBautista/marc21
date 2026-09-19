@@ -77,12 +77,17 @@ ALLOWED_ORIGINS="https://usuario.github.io"
 
 ## Flujo de uso
 
-1. Sube un PDF o imagenes de portada, pagina legal y otras paginas.
-2. Tambien puedes pegar texto manual.
-3. Selecciona idioma, tipo de material y agencia.
-4. El backend envia texto/imagenes a OpenAI para OCR y estructuracion.
-5. Las reglas locales construyen el registro MARC21.
-6. Revisa, edita y descarga el MARCXML.
+1. Selecciona el tipo: libro, capítulo, artículo, tesis o memorias.
+2. Sube un PDF o hasta 10 imágenes en una sola zona. Puedes agregar texto complementario del mismo recurso.
+3. El PDF se lee localmente: se seleccionan páginas relevantes y solo se aplica OCR donde no hay texto utilizable.
+4. El modelo estructura evidencia breve; una segunda búsqueda dirigida intenta completar datos esenciales con páginas nuevas.
+5. Revisa valores, fuentes, citas y propuestas automáticas. Edita y descarga MARCXML o importa al formulario de Koha.
+
+La interfaz ya no solicita agencia ni idioma de catalogación. Se describe en español y se conserva el idioma observado del recurso. `CATALOGING_AGENCY` permite configurar en Render el código institucional de 040; si está vacío se omiten $a/$c.
+
+Las materias automáticas no llevan `$2embnm` ni un código de tesauro inventado. Se identifican como propuestas en la revisión. El número técnico de páginas del PDF no sustituye la extensión bibliográfica.
+
+Consulta [la política de catalogación](docs/skill_catalogacion_automatica_rda_llm.md), [el algoritmo](docs/extraction-instructions.md), [el contrato JSON](docs/master-prompt.md) y [los metadatos por material](docs/document-templates.md). No se envían estos documentos completos en cada llamada.
 
 ## Integracion con el editor de Koha
 

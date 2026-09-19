@@ -1,3 +1,4 @@
+import { selectEvidence, evidenceText, usableText, TYPE_FIELDS, COMMON_FIELDS } from './src/core/evidence.js';
 const fileInput = document.getElementById("fileInput");
 const dropZone = document.getElementById("dropZone");
 const textInput = document.getElementById("textInput");
@@ -18,6 +19,12 @@ let extractedText = "";
 let extractedPageCount = null;
 let uploadedImages = [];
 let pdfImages = [];
+let pdfDocument = null;
+let pdfPages = [];
+let pdfMetadata = {};
+let selectedPages = [];
+let lastRequestKey = "";
+let inputRevision = 0;
 let marcData = null;
 let sourceData = null;
 let lastExtractedText = "";
@@ -41,13 +48,6 @@ function apiFetch(path, options) {
   return fetch(`${API_BASE_URL}${path}`, options);
 }
 
-const IMAGE_SLOTS = [
-  { key: 'cover', label: 'Portada', multiple: false },
-  { key: 'legal', label: 'Página legal', multiple: false },
-  { key: 'lastpage', label: 'Última página', multiple: false },
-  { key: 'other', label: 'Otras páginas', multiple: true },
-];
-
 function setStage(stage, status) {
   const map = { ocr: stageOcr, structure: stageStructure, build: stageBuild };
   const el = map[stage];
@@ -66,10 +66,11 @@ function compressImage(file, maxW = 1200, quality = 0.8) {
     const img = new Image();
     img.onload = () => {
       let w = img.width, h = img.height;
-      if (w > maxW) { h = h * maxW / w; w = maxW; }
+      if (Math.max(w, h) > maxW) { const ratio = maxW / Math.max(w, h); w *= ratio; h *= ratio; }
       const c = document.createElement('canvas');
       c.width = w; c.height = h;
       c.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(img.src);
       resolve(c.toDataURL('image/jpeg', quality).split(',')[1]);
     };
     img.onerror = reject;
@@ -77,69 +78,53 @@ function compressImage(file, maxW = 1200, quality = 0.8) {
   });
 }
 
-function setupImageSlots() {
-  for (const slot of IMAGE_SLOTS) {
-    const el = document.querySelector(`.image-slot[data-slot="${slot.key}"]`);
-    if (!el) continue;
-    const upload = el.querySelector('.slot-upload');
-    upload.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.multiple = slot.multiple;
-      input.onchange = async () => {
-        for (const file of input.files) {
-          const data = await compressImage(file, 1200, 0.8);
-          uploadedImages.push({ slot: slot.key, label: slot.label, data, file });
-        }
-        updateSlotUI(slot.key);
-      };
-      input.click();
-    });
-    el.addEventListener('click', () => upload.click());
-  }
+function invalidateResult() {
+  inputRevision++;
+  sourceData = null;
+  marcData = null;
+  resultBlock.style.display = 'none';
+  document.getElementById('verificationBlock').style.display = 'none';
 }
-
-function updateSlotUI(slotKey) {
-  const el = document.querySelector(`.image-slot[data-slot="${slotKey}"]`);
-  if (!el) return;
-  const preview = el.querySelector('.slot-preview');
-  const images = uploadedImages.filter(i => i.slot === slotKey);
-  el.classList.toggle('has-image', images.length > 0);
-  let existingRemove = el.querySelector('.slot-remove');
-  if (images.length === 0) {
-    preview.innerHTML = '';
-    if (existingRemove) existingRemove.remove();
-    return;
-  }
-  const lastImg = images[images.length - 1];
-  preview.innerHTML = `<img src="data:image/jpeg;base64,${lastImg.data}" alt="${lastImg.label}">`;
-  if (images.length > 1) {
-    const count = el.querySelector('.slot-count') || document.createElement('div');
-    count.className = 'slot-count';
-    count.textContent = `+${images.length - 1} más`;
-    if (!el.querySelector('.slot-count')) el.appendChild(count);
-  } else {
-    const c = el.querySelector('.slot-count');
-    if (c) c.remove();
-  }
-  if (!existingRemove) {
-    const rm = document.createElement('div');
-    rm.className = 'slot-remove';
-    rm.textContent = '×';
-    rm.addEventListener('click', (e) => {
-      e.stopPropagation();
-      uploadedImages = uploadedImages.filter(i => i.slot !== slotKey);
-      updateSlotUI(slotKey);
-      sourceData = null;
-      document.getElementById('verificationBlock').style.display = 'none';
-    });
-    el.appendChild(rm);
-  }
+const imageInput = document.getElementById('imageInput');
+const imageDrop = document.getElementById('imageDrop');
+let loadingImages = false;
+async function addImages(files) {
+  if (loadingImages) return;
+  const valid = [...files].filter(f => f.type.startsWith('image/'));
+  if (uploadedImages.length + valid.length > 10) { alert('Puedes subir hasta 10 imágenes. Elimina alguna antes de agregar más.'); return; }
+  loadingImages = true;
+  generateBtn.disabled = true;
+  try {
+    for (const file of valid) {
+      const data = await compressImage(file);
+      if (!uploadedImages.some(i => i.data === data)) uploadedImages.push({ data, name: file.name });
+    }
+    invalidateResult();
+    renderImages();
+  } catch (e) { alert('No se pudo leer la imagen: ' + e.message); }
+  finally { loadingImages = false; generateBtn.disabled = false; imageInput.value = ''; }
 }
-
-setupImageSlots();
+function renderImages() {
+  const list = document.getElementById('imageList');
+  list.replaceChildren();
+  document.getElementById('imageCount').textContent = `${uploadedImages.length}/10 imágenes`;
+  uploadedImages.forEach((item, index) => {
+    const card = document.createElement('div');
+    const img = document.createElement('img');
+    img.src = 'data:image/jpeg;base64,' + item.data;
+    img.alt = `Imagen ${index + 1}: ${item.name}`;
+    const label = document.createElement('span');
+    label.textContent = `${index + 1}. ${item.name}`;
+    const remove = document.createElement('button');
+    remove.type = 'button'; remove.textContent = 'Eliminar';
+    remove.onclick = () => { uploadedImages.splice(index, 1); invalidateResult(); renderImages(); };
+    card.append(img, label, remove); list.append(card);
+  });
+}
+imageDrop.onclick = () => imageInput.click();
+imageInput.onchange = () => addImages(imageInput.files);
+imageDrop.ondragover = e => e.preventDefault();
+imageDrop.ondrop = e => { e.preventDefault(); addImages(e.dataTransfer.files); };
 
 dropZone.addEventListener("click", () => { fileInput.click(); });
 dropZone.addEventListener("dragover", (e) => { e.preventDefault(); dropZone.classList.add("dragover"); });
@@ -163,58 +148,50 @@ async function renderPdfPageAsImage(pdf, pageNum, scale = 2) {
   return canvas.toDataURL('image/jpeg', 0.85);
 }
 
-async function handlePdf(file) {
-  if (file.type !== "application/pdf") { alert("Solo se aceptan PDFs"); return; }
-  dropZone.querySelector("p").textContent = `Procesando PDF: ${file.name}...`;
-
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    extractedPageCount = pdf.numPages;
-
-    const pagesToRender = Math.min(pdf.numPages, 4);
-    pdfImages = [];
-    extractedText = "";
-
-    const thumbnailsContainer = pdfPreview.querySelector('.pdf-thumbnails') || document.createElement('div');
-    thumbnailsContainer.className = 'pdf-thumbnails';
-    thumbnailsContainer.innerHTML = '';
-    pdfPreview.style.display = 'block';
-    pdfPreview.querySelector('.pdf-thumbnails')?.remove();
-    pdfPreview.appendChild(thumbnailsContainer);
-
-    for (let i = 1; i <= pagesToRender; i++) {
-      const dataUrl = await renderPdfPageAsImage(pdf, i, 1.5);
-      const base64 = dataUrl.split(',')[1];
-
-      const slotMap = { 1: 'cover', 2: 'legal', 3: 'lastpage', 4: 'other' };
-      const slot = slotMap[i] || 'other';
-      const labelMap = { cover: 'Portada', legal: 'Pág. legal', lastpage: 'Última pág.', other: 'Otras págs.' };
-
-      pdfImages.push({ slot, label: labelMap[slot] || `Pág. ${i}`, data: base64 });
-
-      const thumb = document.createElement('div');
-      thumb.style.cssText = 'flex:0 0 auto;width:80px;border:2px solid #e2e8f0;border-radius:6px;overflow:hidden;';
-      thumb.innerHTML = `<img src="${dataUrl}" style="width:100%;height:auto;display:block;" title="Página ${i}">`;
-      thumbnailsContainer.appendChild(thumb);
-
-      const pageText = await pdf.getPage(i).then(p =>
-        p.getTextContent().then(c => c.items.map(item => item.str).join(" "))
-      );
-      extractedText += pageText + "\n\n";
+async function prepareEvidence(excluded = [], terms = null) {
+  const selected = selectEvidence(pdfPages, getSelectedFormat(), excluded, terms);
+  const images = [];
+  const textPages = [];
+  for (const page of selected) {
+    if (usableText(page.text)) textPages.push(page);
+    else {
+      const data = (await renderPdfPageAsImage(pdfDocument, page.page, 1.5)).split(',')[1];
+      images.push({ page: page.page, label: `Página ${page.page}`, data });
     }
-
-    extractedText = extractedText.trim();
-    dropZone.querySelector("p").textContent = `PDF listo: ${file.name} (${pdf.numPages} pág., ${pagesToRender} págs. renderizadas como imágenes)`;
-    sourceData = null;
-    document.getElementById('verificationBlock').style.display = 'none';
-  } catch (error) {
-    alert("Error al procesar PDF: " + error.message);
-    extractedText = "";
-    extractedPageCount = null;
-    pdfImages = [];
-    pdfPreview.style.display = 'none';
   }
+  return { selected, images, text: evidenceText(textPages) };
+}
+async function handlePdf(file) {
+  if (file.type !== 'application/pdf') { alert('Solo se aceptan PDFs'); return; }
+  generateBtn.disabled = true;
+  invalidateResult();
+  pdfImages = []; pdfPages = []; extractedText = ''; extractedPageCount = null;
+  dropZone.querySelector('p').textContent = `Leyendo localmente: ${file.name}…`;
+  try {
+    if (pdfDocument) await pdfDocument.destroy();
+    pdfDocument = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+    extractedPageCount = pdfDocument.numPages;
+    const meta = await pdfDocument.getMetadata().catch(() => ({ info: {} }));
+    pdfMetadata = Object.fromEntries(['Title','Author','Creator','Producer','CreationDate','ModDate','Language'].filter(k => meta.info?.[k]).map(k => [k, meta.info[k]]));
+    for (let page = 1; page <= extractedPageCount; page++) {
+      const p = await pdfDocument.getPage(page);
+      const content = await p.getTextContent();
+      pdfPages.push({ page, text: content.items.map(i => i.str + (i.hasEOL ? '\n' : ' ')).join('') });
+      p.cleanup();
+    }
+    const evidence = await prepareEvidence();
+    selectedPages = evidence.selected.map(p => p.page);
+    pdfImages = evidence.images;
+    extractedText = evidence.text;
+    pdfPreview.style.display = 'block';
+    pdfPreview.querySelector('.pdf-thumbnails').textContent = `Fuentes seleccionadas: páginas ${selectedPages.join(', ')}. OCR necesario en ${pdfImages.length}.`;
+    dropZone.querySelector('p').textContent = `${file.name}: ${extractedPageCount} páginas leídas localmente; ${selectedPages.length} seleccionadas.`;
+  } catch (e) {
+    pdfDocument = null; pdfPages = []; pdfImages = []; extractedText = ''; extractedPageCount = null;
+    pdfPreview.style.display = 'none';
+    dropZone.querySelector('p').textContent = 'Arrastra y suelta un PDF aquí';
+    alert('Error al procesar PDF: ' + e.message);
+  } finally { generateBtn.disabled = false; }
 }
 
 function getSelectedStandard() { return 'RDA'; }
@@ -222,33 +199,8 @@ function getSelectedFormat() {
   const checked = document.querySelector('input[name="format"]:checked');
   return checked ? checked.value : 'book';
 }
-function getSelectedCatLang() {
-  const checked = document.querySelector('input[name="catLang"]:checked');
-  return checked ? checked.value : 'spa';
-}
-
-async function regenerateFromCache() {
-  if (!sourceData) return;
-  const standard = getSelectedStandard();
-  const format = getSelectedFormat();
-  const agency = document.getElementById("agencyInput").value.trim() || 'IGN';
-  const catLang = getSelectedCatLang();
-  try {
-    const res = await apiFetch('/api/format', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source: sourceData, standard, agency, format: format, catLang, pageCount: extractedPageCount, text: lastExtractedText || '' })
-    });
-    if (!res.ok) return;
-    const data = await res.json();
-    marcData = data.result;
-    renderMarc(marcData);
-  } catch (e) { /* ignore */ }
-}
-
 async function generateMarc() {
-  let text = textInput.value.trim();
-  if (!text && extractedText) text = extractedText;
+  let text = [extractedText, textInput.value.trim() ? '[Texto aportado]\n' + textInput.value.trim() : '', extractedPageCount ? '[Metadatos PDF]\n' + JSON.stringify({ ...pdfMetadata, technicalPageCount: extractedPageCount }) : ''].filter(Boolean).join('\n\n');
   if (!text && pdfImages.length === 0 && uploadedImages.length === 0) {
     alert("Por favor, ingresa texto, selecciona un archivo PDF o sube imágenes");
     return;
@@ -256,11 +208,13 @@ async function generateMarc() {
 
   const standard = getSelectedStandard();
   const format = getSelectedFormat();
-  const agency = document.getElementById("agencyInput").value.trim() || 'IGN';
-  const catLang = getSelectedCatLang();
+  const agency = '';
+  const catLang = 'spa';
 
-  const imagesPayload = [...pdfImages, ...uploadedImages.map(i => ({ slot: i.slot, label: i.label, data: i.data }))];
+  const imagesPayload = [...pdfImages, ...uploadedImages.map((i, n) => ({ label: `Imagen ${n + 1}`, data: i.data }))];
 
+  const requestRevision = inputRevision;
+  const requestKey = JSON.stringify({ text, format, images: imagesPayload });
   generateBtn.disabled = true;
   generateBtn.textContent = "Procesando...";
   output.textContent = "";
@@ -271,7 +225,7 @@ async function generateMarc() {
   setStage('build', '');
 
   try {
-    if (sourceData && text === lastExtractedText && imagesPayload.length === 0) {
+    if (sourceData && requestKey === lastRequestKey) {
       setProgress(50);
       setStage('build', 'active');
       const res = await apiFetch('/api/format', {
@@ -281,6 +235,7 @@ async function generateMarc() {
       });
       if (!res.ok) throw new Error((await res.json()).error);
       const data = await res.json();
+      if (requestRevision !== inputRevision) throw new Error("Los datos cambiaron durante el análisis. Genera el registro de nuevo.");
       marcData = data.result;
       setProgress(100);
       setStage('build', 'done');
@@ -311,16 +266,31 @@ async function generateMarc() {
       else { setProgress(50); setStage('structure', 'active'); }
 
       const data = await res.json();
+      // One targeted pass, only new evidence, when essential fields remain missing.
+      const required = ['title', 'year', ...(format === 'thesis' ? ['institution','degree'] : format === 'article' || format === 'chapter' ? ['hostTitle'] : ['publisher'])];
+      const missing = required.filter(k => !data.source[k]);
+      if (missing.length && pdfDocument) {
+        const patterns = { title: /./, year: /copyright|©|public|edici[oó]n|\b(?:19|20)\d{2}\b/i, publisher: /editorial|publisher|publicado|published/i, institution: /universidad|institut/i, degree: /grado|tesis|thesis/i, hostTitle: /revista|journal|ISBN|ISSN/i };
+        const terms = new RegExp(missing.map(k => patterns[k].source).join('|'), 'i');
+        const extra = await prepareEvidence(selectedPages, terms);
+        if (extra.text || extra.images.length) {
+          const follow = await apiFetch('/api/extract-metadata', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: extra.text, images: extra.images, format, previous: data.source, missing }) });
+          if (!follow.ok) throw new Error((await follow.json()).error);
+          const updated = await follow.json();
+          Object.assign(data, updated);
+        }
+      }
+      if (requestRevision !== inputRevision) throw new Error("Los datos cambiaron durante el análisis. Genera el registro de nuevo.");
       marcData = data.result;
       sourceData = data.source;
+      lastRequestKey = requestKey;
       lastExtractedText = text;
 
       setProgress(90);
       setStage('structure', 'done');
       setStage('build', 'active');
 
-      const snippets = findSourceSnippets(sourceData, text);
-      renderVerification(sourceData, snippets);
+      renderVerification(sourceData);
       document.getElementById('verificationBlock').style.display = 'block';
 
       setProgress(100);
@@ -422,79 +392,7 @@ function toggleFullView() {
   }
 }
 
-function findSnippetInText(value, sourceText) {
-  if (!value || !sourceText) return null;
-  const plainValue = String(value).toLowerCase().replace(/\s+/g, ' ').trim();
-  const plainSource = sourceText.toLowerCase().replace(/\s+/g, ' ');
-  let idx = plainSource.indexOf(plainValue);
-  if (idx === -1 && plainValue.length > 25) {
-    const shortVal = plainValue.substring(0, 25);
-    idx = plainSource.indexOf(shortVal);
-  }
-  if (idx === -1) return null;
-  const ctx = 40;
-  const start = Math.max(0, idx - ctx);
-  const end = Math.min(sourceText.length, idx + plainValue.length + ctx);
-  let snippet = sourceText.substring(start, end);
-  if (start > 0) snippet = '...' + snippet;
-  if (end < sourceText.length) snippet = snippet + '...';
-  return snippet.trim().replace(/\s+/g, ' ');
-}
-
-function findSourceSnippets(source, sourceText) {
-  if (!source || !sourceText) return {};
-  const snippets = {};
-  const singleFields = ['title', 'subtitle', 'publisher', 'place', 'year', 'isbn', 'doi', 'edition', 'pages', 'language', 'series', 'notes', 'hostTitle', 'volume', 'issue', 'degree', 'institution', 'advisor', 'meetingName', 'meetingDate', 'meetingPlace', 'corporate', 'dewey', 'lcClassification'];
-  for (const key of singleFields) {
-    const v = source[key];
-    if (!v) continue;
-    const s = findSnippetInText(Array.isArray(v) ? v.filter(Boolean).join(' ') : String(v), sourceText);
-    if (s) snippets[key] = s;
-  }
-  if (source.author && Array.isArray(source.author)) {
-    const all = [];
-    for (const a of source.author) {
-      const s = findSnippetInText(a, sourceText);
-      if (s) all.push(s);
-    }
-    if (all.length > 0) snippets.author = all.join('\n---\n');
-  }
-  if (source.subjects && Array.isArray(source.subjects)) {
-    const all = [];
-    for (const subj of source.subjects) {
-      const s = findSnippetInText(subj, sourceText);
-      if (s) all.push(s);
-    }
-    if (all.length > 0) snippets.subjects = all.join('\n');
-  }
-  return snippets;
-}
-
-let sourceTooltipEl = null;
-
-function showSourceTooltip(event, snippet) {
-  if (!sourceTooltipEl) {
-    sourceTooltipEl = document.createElement('div');
-    sourceTooltipEl.className = 'source-tooltip';
-    document.body.appendChild(sourceTooltipEl);
-  }
-  sourceTooltipEl.textContent = snippet;
-  sourceTooltipEl.style.display = 'block';
-  const rect = event.target.getBoundingClientRect();
-  let top = rect.bottom + 6;
-  let left = rect.left;
-  if (left + 360 > window.innerWidth) left = window.innerWidth - 370;
-  if (left < 4) left = 4;
-  if (top + 210 > window.innerHeight) top = rect.top - 210;
-  sourceTooltipEl.style.top = top + 'px';
-  sourceTooltipEl.style.left = left + 'px';
-}
-
-function hideSourceTooltip() {
-  if (sourceTooltipEl) sourceTooltipEl.style.display = 'none';
-}
-
-function renderVerification(source, snippets) {
+function renderVerification(source) {
   const tbody = document.getElementById('verificationBody');
   if (!source) { tbody.innerHTML = ''; return; }
 
@@ -548,24 +446,24 @@ function renderVerification(source, snippets) {
 
     const isEmpty = !value || value === '' || value === '(dejar vacio)' || value === '(dejar vacio si no se encuentra)';
     const isDefault = value === '[Sin titulo]' || value === '[editor no identificado]' || value === '[Lugar de publicacion no identificado]';
-    const snippet = snippets ? snippets[f.key] : null;
-    const hasSnippet = !!snippet;
+    if (![...COMMON_FIELDS, ...(TYPE_FIELDS[getSelectedFormat()] || [])].includes(f.key)) continue;
+    const ev = source.evidence?.[f.key];
+    const snippet = ev?.quote || null;
+    const hasSnippet = ev?.verified === true;
 
     let statusClass, statusText;
     if (isDefault) { statusClass = 'status-warn'; statusText = 'Valor por defecto'; }
     else if (isEmpty) { statusClass = 'status-missing'; statusText = 'No encontrado'; }
-    else if (hasSnippet) { statusClass = 'status-ok'; statusText = 'Extraído ✓'; }
+    else if (ev?.status === 'proposed') { statusClass = 'status-warn'; statusText = 'Propuesta automática'; }
+    else if (ev?.status === 'ambiguous') { statusClass = 'status-warn'; statusText = 'Ambiguo: revisar'; }
+    else if (hasSnippet) { statusClass = 'status-ok'; statusText = 'Cita localizada ✓'; }
     else { statusClass = 'status-warn'; statusText = 'Extraído (no verif.)'; }
 
     const displayValue = isEmpty && !isDefault ? '' : value;
 
     html += '<tr><td>' + escapeHtml(f.label) + '</td><td>' + escapeHtml(displayValue) + '</td>';
-    if (snippet) {
-      html += '<td class="' + statusClass + '" data-snippet="' + escapeHtml(snippet) + '" onmouseenter="showSourceTooltip(event, this.dataset.snippet)" onmouseleave="hideSourceTooltip()">' + statusText + '</td>';
-    } else {
-      html += '<td class="' + statusClass + '">' + statusText + '</td>';
-    }
-    html += '</tr>';
+    html += '<td class="' + statusClass + '">' + statusText + '</td>';
+    html += '<td>' + escapeHtml(ev?.source || 'Sin fuente') + '</td><td>' + escapeHtml(snippet || 'Sin evidencia literal') + '</td></tr>';
   }
 
   tbody.innerHTML = html;
@@ -853,13 +751,22 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && isFullView) toggleFullView();
 });
 
-document.querySelectorAll('input[name="format"], input[name="catLang"]').forEach(el => {
-  el.addEventListener("change", () => {
-    if (sourceData && marcData) regenerateFromCache();
+document.querySelectorAll('input[name="format"]').forEach(el => {
+  el.addEventListener("change", async () => {
+    invalidateResult();
+    if (pdfDocument) {
+      generateBtn.disabled = true;
+      try {
+        const e = await prepareEvidence(); extractedText = e.text; pdfImages = e.images; selectedPages = e.selected.map(p => p.page);
+        pdfPreview.querySelector('.pdf-thumbnails').textContent = `Fuentes seleccionadas: páginas ${selectedPages.join(', ')}. OCR necesario en ${pdfImages.length}.`;
+      } catch (error) { alert('No se pudo preparar la evidencia: ' + error.message); }
+      finally { generateBtn.disabled = false; }
+    }
   });
 });
 
-textInput.addEventListener("change", () => {
+textInput.addEventListener("input", () => {
+  invalidateResult();
   const val = textInput.value.trim();
   if (val && val !== lastExtractedText) {
     sourceData = null;

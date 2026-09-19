@@ -3,7 +3,7 @@ import {
   detectDates, detectCountry, splitTitle, normalizeGeo
 } from '../utils/helpers.js';
 import {
-  normalizeMarcData, buildChronologicalField, suggestClassification
+  normalizeMarcData, buildChronologicalField
 } from './marc-rules.js';
 
 export function buildMarcRecord(metadata, opts = {}) {
@@ -13,9 +13,9 @@ export function buildMarcRecord(metadata, opts = {}) {
   const isThesis = formatType === 'thesis';
   const isProceedings = formatType === 'proceedings';
   const isAnalytical = isArticle || isChapter;
-  const agency = opts.agency || 'IGN';
+  const agency = opts.agency || '';
   const catLang = opts.catLang || 'spa';
-  const subjectInd2 = catLang === 'spa' ? '7' : '4';
+  const subjectInd2 = '4';
   const now = new Date();
   const data = {};
 
@@ -57,7 +57,7 @@ export function buildMarcRecord(metadata, opts = {}) {
   const issn = asStr(metadata.issn);
   const edition = asStr(metadata.edition);
   const subjects = Array.isArray(metadata.subjects) ? metadata.subjects : [];
-  const language = asStr(metadata.language) || 'spa';
+  const language = asStr(metadata.language) || 'und';
   const series = asStr(metadata.series);
   const notes = asStr(metadata.notes);
   const hostTitle = asStr(metadata.hostTitle);
@@ -99,11 +99,12 @@ export function buildMarcRecord(metadata, opts = {}) {
     '    ' + ' ' + ' ' + '    ' +     ' ' + conf + ' ' + index + ' ' + fict + bio +
     langCode + mod + src;
 
-  if (validIsbn && !isArticle) data['020'] = { ind1: ' ', ind2: ' ', a: validIsbn };
+  if (validIsbn && !isArticle && !isChapter && !isThesis) data['020'] = { ind1: ' ', ind2: ' ', a: validIsbn };
   if (issn && isArticle) data['022'] = { ind1: ' ', ind2: ' ', a: issn };
   if (doi) data['024'] = { ind1: '7', ind2: ' ', a: doi, '2': 'doi' };
 
-  data['040'] = { ind1: ' ', ind2: ' ', a: agency, b: catLang, c: agency, e: 'rda' };
+  data['040'] = { ind1: ' ', ind2: ' ', b: catLang, e: 'rda' };
+  if (agency) Object.assign(data['040'], { a: agency, c: agency });
 
   if (language && langCode !== 'spa' && langCode !== '') {
     data['041'] = { ind1: '0', ind2: ' ', a: langCode };
@@ -119,7 +120,7 @@ export function buildMarcRecord(metadata, opts = {}) {
       const r = role || defaultRole;
       return { a: r ? invertName(name) + ',' : invertName(name), e: r ? r + '.' : undefined };
     };
-    if (isProceedings && meetingName) {
+    if (isProceedings) {
       data['700'] = [];
       for (const author of authors) {
         data['700'].push({ ind1: '1', ind2: ' ', ...authorWithPunct(author, getRole(author) || 'editor') });
@@ -164,25 +165,16 @@ export function buildMarcRecord(metadata, opts = {}) {
     if (meetingPlace) data['111'].c = meetingPlace;
   }
 
-  let useTitle = title;
-  if (!useTitle) {
-    if (authors.length > 0) {
-      useTitle = 'Obra de ' + authors[0];
-    } else if (subjects.length > 0) {
-      useTitle = 'Obra sobre ' + String(subjects[0]).split('--')[0];
-    } else {
-      useTitle = '[Sin titulo]';
-    }
-  }
+  const useTitle = title || '[Sin titulo]';
 
   {
-    const normalized = normalizeCase(useTitle);
+    const normalized = useTitle;
     let { main, sub } = splitTitle(normalized);
     if (!sub && subtitle) sub = subtitle;
       const autorList = personalAuthors.map(normalizeName).join(', ');
 
     const articleMatch = main.match(/^(El |La |Los |Las |Un |Una |The |A |An )/i);
-    const ind2 = articleMatch ? (articleMatch[1].trim().length === 2 ? '2' : '3') : '0';
+    const ind2 = articleMatch ? String(articleMatch[1].length) : '0';
 
     let a = main;
     let b = sub || '';
@@ -194,15 +186,15 @@ export function buildMarcRecord(metadata, opts = {}) {
       else a += ' / ';
     }
 
-    const titleField = { ind1: '1', ind2: ind2, a: a };
+    const titleField = { ind1: (data['100'] || data['110'] || data['111']) ? '1' : '0', ind2: ind2, a: a };
     if (b) titleField.b = b;
     if (c) titleField.c = c;
     data['245'] = titleField;
   }
 
-  if (edition && !isThesis && !isChapter) {
+  if (edition && !isThesis && !isChapter && !isArticle) {
     const cleanEdition = edition.replace(/^ed\.?\s*/i, '').trim();
-    data['250'] = { ind1: ' ', ind2: ' ', a: cleanEdition + ' ed.' };
+    data['250'] = { ind1: ' ', ind2: ' ', a: cleanEdition.replace(/\.$/, '') + '.' };
   }
 
   if (isThesis) {
@@ -226,12 +218,12 @@ export function buildMarcRecord(metadata, opts = {}) {
   if (!isArticle && !isChapter) {
     const pubField = { ind1: ' ', ind2: isThesis ? '0' : '1' };
     if (isThesis) {
-      pubField.a = (normalizeCase(place) || '[Lugar de publicacion no identificado]') + ' : ';
+      pubField.a = (place || '[Lugar de publicacion no identificado]') + ' : ';
       pubField.b = (institution || publisher || '[editor no identificado]') + ', ';
       pubField.c = (year || '[fecha de publicacion no identificada]') + '.';
     } else {
-      const placeNorm = normalizeCase(place);
-      let pubNorm = publisher ? normalizeCase(publisher) : '';
+      const placeNorm = place;
+      let pubNorm = publisher || '';
       if (pubNorm && placeNorm && pubNorm.toLowerCase() === placeNorm.toLowerCase()) {
         pubNorm = '[editor no identificado]';
       }
@@ -242,12 +234,11 @@ export function buildMarcRecord(metadata, opts = {}) {
     data['264'] = pubField;
   }
 
-  const actualPageCount = !isAnalytical && opts.pageCount ? parseInt(opts.pageCount) : null;
-  const pagesSource = actualPageCount ? String(actualPageCount) : pages;
+  const pagesSource = pages;
   if (pagesSource) {
     const pagesField = { ind1: ' ', ind2: ' ' };
     if (isChapter || isArticle) {
-      const rangeMatch = pagesSource.match(/(\d+)\s*-?\s*(\d+)/);
+      const rangeMatch = pagesSource.match(/(\d+)\s*[-–]\s*(\d+)/);
       if (rangeMatch) {
         pagesField.a = 'paginas ' + rangeMatch[1] + '-' + rangeMatch[2];
       } else {
@@ -255,7 +246,7 @@ export function buildMarcRecord(metadata, opts = {}) {
       }
     } else {
       const match = pagesSource.match(/(\d+)/);
-      const pagesNum = match ? match[1] : pagesSource;
+      const pagesNum = pagesSource.replace(/\s*(?:páginas|paginas|p\.)\s*$/i, '');
       const unit = catLang === 'spa' ? ' paginas' : ' p.';
       let a = pagesNum + unit;
       const hasIllustrations = pagesSource.toLowerCase().includes('il') || pagesSource.toLowerCase().includes('fig');
@@ -289,7 +280,7 @@ export function buildMarcRecord(metadata, opts = {}) {
     }
     if (place || publisher) {
       const dParts = [];
-      if (place) dParts.push(normalizeCase(place));
+      if (place) dParts.push(place);
       if (publisher) dParts.push(normalizeCase(publisher));
       hostField.d = dParts.join(' : ');
     }
@@ -297,10 +288,10 @@ export function buildMarcRecord(metadata, opts = {}) {
       hostField.d = (hostField.d ? hostField.d + ', ' : '') + year.replace(/[^0-9-]/g, '');
     }
     if (isChapter && pages) {
-      const rangeMatch = pages.match(/(\d+)\s*-?\s*(\d+)/);
+      const rangeMatch = pages.match(/(\d+)\s*[-–]\s*(\d+)/);
       if (rangeMatch) hostField.g = 'Paginas ' + rangeMatch[1] + '-' + rangeMatch[2];
     } else if (!isChapter && pages) {
-      const pageMatch = pages.match(/(\d+)\s*-?\s*(\d+)/);
+      const pageMatch = pages.match(/(\d+)\s*[-–]\s*(\d+)/);
       if (pageMatch) hostField.h = 'p. ' + pageMatch[1] + '-' + pageMatch[2];
     }
     if (isbn) hostField.z = isbn;
@@ -336,7 +327,6 @@ export function buildMarcRecord(metadata, opts = {}) {
         mainIdx = 1;
       }
       const field = { ind1: ' ', ind2: subjectInd2, a: parts[mainIdx] };
-      if (catLang === 'spa') field['2'] = 'embnm';
       for (let i = 0; i < parts.length; i++) {
         if (i === mainIdx) continue;
         if (isCentury(parts[i])) {
@@ -350,7 +340,6 @@ export function buildMarcRecord(metadata, opts = {}) {
       subjectsFields.push(field);
     } else {
       const sf = { ind1: ' ', ind2: subjectInd2, a: s };
-      if (catLang === 'spa') sf['2'] = 'embnm';
       subjectsFields.push(sf);
     }
   }
@@ -364,27 +353,8 @@ export function buildMarcRecord(metadata, opts = {}) {
 
   data['856'] = { ind1: ' ', ind2: ' ', a: '' };
 
-  let effectiveLc = lcClassification;
-  let effectiveDewey = dewey;
-  const suggested = suggestClassification(subjects);
-  if (!effectiveLc && suggested.lc) effectiveLc = suggested.lc;
-  if (effectiveDewey) {
-    const deweyClean = effectiveDewey.replace(/[^0-9.]/g, '').trim();
-    if (!/^\d{1,4}(\.\d+)?$/.test(deweyClean)) effectiveDewey = '';
-  }
-  if (effectiveDewey && !lcClassification && suggested.lc && suggested.dewey) {
-    const deweyStr = effectiveDewey.replace(/[^0-9.]/g, '');
-    const lcStr = suggested.lc.replace(/[^0-9.A-Za-z]/g, '');
-    if (lcStr.includes(deweyStr) || (!/\d/.test(lcStr) && /^\d{1,3}(\.\d+)?$/.test(deweyStr))) {
-      effectiveDewey = suggested.dewey;
-    }
-  }
-  if (effectiveDewey && effectiveLc) {
-    const deweyDigits = effectiveDewey.replace(/[^0-9]/g, '');
-    const lcDigits = effectiveLc.replace(/[^0-9]/g, '');
-    if (lcDigits && deweyDigits && lcDigits.startsWith(deweyDigits)) effectiveDewey = '';
-  }
-  if (!effectiveDewey && suggested.dewey) effectiveDewey = suggested.dewey;
+  const effectiveLc = lcClassification;
+  const effectiveDewey = /^\d{1,3}(\.\d+)?$/.test(dewey) ? dewey : '';
 
   if (effectiveLc) {
     data['050'] = { ind1: ' ', ind2: ' ', a: effectiveLc };

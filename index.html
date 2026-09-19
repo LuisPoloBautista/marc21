@@ -64,19 +64,6 @@
 
         <div class="toolbar">
           <div class="toolbar-item">
-            <span class="toolbar-label">Agencia</span>
-            <input type="text" id="agencyInput" value="IGN" class="toolbar-input" />
-          </div>
-          <div class="toolbar-divider"></div>
-          <div class="toolbar-item">
-            <span class="toolbar-label">Idioma</span>
-            <div class="toolbar-chips">
-              <label class="chip"><input type="radio" name="catLang" value="spa" checked><span>Español</span></label>
-              <label class="chip"><input type="radio" name="catLang" value="eng"><span>Inglés</span></label>
-            </div>
-          </div>
-          <div class="toolbar-divider"></div>
-          <div class="toolbar-item">
             <span class="toolbar-label">Tipo</span>
             <div class="toolbar-chips">
               <label class="chip"><input type="radio" name="format" value="book" checked><span>Libro</span></label>
@@ -101,29 +88,11 @@
           </div>
           <div class="cat-col">
             <label class="label-header">2. Sube imágenes</label>
-            <p style="font-size:12px;color:#64748b;margin:0 0 10px;">Organizadas por sección para análisis visual</p>
-            <div class="image-slots">
-              <div class="image-slot" data-slot="cover">
-                <span class="slot-label">Portada</span>
-                <div class="slot-upload">+</div>
-                <div class="slot-preview"></div>
-              </div>
-              <div class="image-slot" data-slot="legal">
-                <span class="slot-label">Pág. legal</span>
-                <div class="slot-upload">+</div>
-                <div class="slot-preview"></div>
-              </div>
-              <div class="image-slot" data-slot="lastpage">
-                <span class="slot-label">Última pág.</span>
-                <div class="slot-upload">+</div>
-                <div class="slot-preview"></div>
-              </div>
-              <div class="image-slot" data-slot="other">
-                <span class="slot-label">Otras págs.</span>
-                <div class="slot-upload">+</div>
-                <div class="slot-preview"></div>
-              </div>
-            </div>
+            <p class="upload-help">Hasta 10 imágenes del mismo recurso: portada, página legal, índice o colofón. Se analizan como páginas de un documento.</p>
+            <input type="file" id="imageInput" accept="image/*" multiple hidden>
+            <button type="button" id="imageDrop" class="drop-zone">Arrastra imágenes o haz clic para seleccionarlas</button>
+            <p id="imageCount" aria-live="polite">0/10 imágenes</p>
+            <div id="imageList" class="image-list"></div>
           </div>
           <div class="cat-col">
             <label class="label-header">3. Describe</label>
@@ -133,7 +102,7 @@
 
         <div class="stage-indicator" id="stageIndicator">
           <div class="stage" id="stageOcr">1. OCR Visual</div>
-          <div class="stage" id="stageStructure">2. Estructurar MARC21</div>
+          <div class="stage" id="stageStructure">2. Estructurar metadatos</div>
           <div class="stage" id="stageBuild">3. Generar registro</div>
         </div>
 
@@ -165,14 +134,14 @@
         <div class="block" id="verificationBlock" style="display: none;">
           <label class="label-header">Verificación de datos extraídos</label>
           <p style="font-size:13px;color:#64748b;margin:0 0 12px;">
-            Esta tabla muestra qué información fue extraída. Los campos con <strong style="color:#16a34a;">✓</strong> tienen texto fuente verificado. Los campos en <strong style="color:#d97706;">naranja</strong> no se pudieron verificar.
+            Cita localizada significa coincidencia en la fuente extraída, no validación del OCR ni de su interpretación. Revisa datos ambiguos, propuestas automáticas y campos sin evidencia.
           </p>
-          <table class="verification-table" id="verificationTable">
+          <div class="verification-scroll"><table class="verification-table" id="verificationTable">
             <thead>
-              <tr><th>Campo</th><th>Valor extraído</th><th>Estado</th></tr>
+              <tr><th>Campo</th><th>Valor extraído</th><th>Estado</th><th>Fuente</th><th>Evidencia literal</th></tr>
             </thead>
             <tbody id="verificationBody"></tbody>
-          </table>
+          </table></div>
         </div>
 
         <details class="info-section" id="infoSection">
@@ -181,6 +150,7 @@
             Información importante
           </summary>
           <div class="info-section-content">
+            <p>La descripción se redacta en español; el idioma del recurso se identifica a partir de la evidencia. El total de páginas del PDF es un dato técnico, no la extensión bibliográfica. Las materias se muestran como propuestas automáticas (sin $2 de un tesauro no consultado).</p>
             <p><strong>Aspectos fuera del alcance</strong></p>
             <ul>
               <li>No crea puntos de acceso autorizados.</li>
@@ -192,7 +162,7 @@
 
             <div class="highlight">
               <p style="margin:0;font-weight:600;">Privacidad y datos</p>
-              <p style="margin:6px 0 0;">La aplicación envía el texto e imágenes al servidor configurado y el servidor consulta la API de OpenAI para extraer y estructurar metadatos. No coloque claves de API en el navegador ni en GitHub Pages; configúrelas solo como variables de entorno del backend.</p>
+              <p style="margin:6px 0 0;">La aplicación envía únicamente la evidencia seleccionada y las imágenes necesarias al servidor configurado y el servidor consulta la API de OpenAI para extraer y estructurar metadatos. No coloque claves de API en el navegador ni en GitHub Pages; configúrelas solo como variables de entorno del backend.</p>
             </div>
 
             <p><strong>Recomendaciones para mejorar la calidad del registro</strong></p>
@@ -200,7 +170,7 @@
               <li><strong>Verifique siempre los campos 1xx/7xx:</strong> los nombres de autor pueden requerir normalización según las reglas de catalogación de su institución.</li>
               <li><strong>Revise las materias (650):</strong> el sistema sugiere materias basadas en el texto, pero no aplica vocabularios controlados (LCSH, EMBUS, etc.).</li>
               <li><strong>Complete los puntos de acceso secundarios:</strong> el sistema no genera encabezamientos adicionales (700/710) más allá de autores secundarios explícitos.</li>
-              <li><strong>Valide las clasificaciones 050/082:</strong> las sugerencias de LC y Dewey son orientativas. Consulte fuentes autorizadas (ClassWeb, WebDewey) para confirmar.</li>
+              <li><strong>Valide las clasificaciones 050/082:</strong> las clasificaciones transcritas de la fuente requieren revisión. Consulte fuentes autorizadas (ClassWeb, WebDewey) para confirmar.</li>
               <li><strong>Revise el campo 264:</strong> la secuencia de publicación (lugar, editor, fecha) puede requerir ajustes según RDA o las políticas locales.</li>
               <li><strong>Complete el campo 300:</strong> descripción física (ilustraciones, dimensiones, material acompañante) no siempre se extrae automáticamente.</li>
               <li><strong>Use la vista de edición</strong> para hacer ajustes directos al registro MARC antes de descargarlo.</li>
@@ -219,22 +189,23 @@
       <div class="sidebar-inner">
       <div class="sidebar-card">
         <h3><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#f1652f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg> ¿Cómo funciona?</h3>
-        <div class="step"><div class="step-num">1</div><div class="step-text">Sube un PDF (se renderizan las primeras páginas como imágenes) o imágenes organizadas (portada, página legal, última página).</div></div>
-        <div class="step"><div class="step-num">2</div><div class="step-text"><strong>OCR Visual:</strong> un modelo OpenAI con visión analiza las imágenes y extrae el texto visible.</div></div>
+        <div class="step"><div class="step-num">1</div><div class="step-text">Selecciona el tipo y sube un PDF o hasta 10 imágenes del mismo recurso. Puedes agregar texto complementario.</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text"><strong>Evidencia:</strong> extracción local de texto y selección de páginas; OCR solo en imágenes y páginas sin texto utilizable.</div></div>
         <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Estructuración:</strong> un modelo OpenAI interpreta el texto y lo estructura en metadatos MARC21 según reglas RDA.</div></div>
-        <div class="step"><div class="step-num">4</div><div class="step-text">El sistema genera un registro MARC21 válido con campos, indicadores y subcampos.</div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-text">Una segunda búsqueda dirigida intenta completar los datos esenciales faltantes. Las reglas locales construyen el borrador MARC21.</div></div>
         <div class="step"><div class="step-num">5</div><div class="step-text">Revisa, edita y descarga el registro en formato MARCXML para importar en Koha u otros ILS.</div></div>
       </div>
 
       <div class="sidebar-card" id="explicabilidad">
-        <h3><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#f1652f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 22 8.5 12 15 2 8.5"/><polyline points="2 15.5 12 22 22 15.5"/></svg> Pipeline de dos agentes</h3>
-        <p>Este sistema utiliza un pipeline de dos agentes de IA:</p>
+        <h3><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#f1652f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 22 8.5 12 15 2 8.5"/><polyline points="2 15.5 12 22 22 15.5"/></svg> Pipeline de catalogación</h3>
+        <p>PDF o imágenes → evidencia seleccionada → JSON bibliográfico → revisión → MARC21.</p>
         <ul>
-          <li><strong>Agente OCR</strong> (<code>OPENAI_OCR_MODEL</code>): modelo con visión especializado en extraer texto de imágenes de documentos.</li>
-          <li><strong>Agente Estructurador</strong> (<code>OPENAI_STRUCTURING_MODEL</code>): modelo que aplica reglas de catalogación RDA/ISBD para estructurar metadatos en MARC21.</li>
+          <li>Libros: ventana inicial de 10 primeras y 3 últimas páginas; artículos: primeras 2 y última. Se buscan señales en el resto del texto.</li>
+          <li>Hasta 10 páginas candidatas por selección, con bloques deduplicados y presupuesto de 18 000 caracteres de evidencia.</li>
+          <li>OCR solo cuando hace falta. Las imágenes conservan su número de carga; las páginas PDF, su número físico.</li>
+          <li>Una segunda búsqueda dirigida incorpora hasta 3 páginas nuevas cuando faltan datos esenciales y hay texto local que permite localizarlas.</li>
         </ul>
-        <p><span class="badge">Nuevo</span></p>
-        <p style="font-size:12px;color:#94a3b8;">El PDF se convierte automáticamente a imágenes para el análisis visual. Cada etapa tiene reintentos automáticos si la respuesta no es válida.</p>
+        <p>En PDF escaneados sin texto, la búsqueda fuera de la selección inicial requiere aportar imágenes de las páginas faltantes. Repetir una generación sin cambios reutiliza el resultado.</p>
       </div>
 
       <div class="sidebar-card">
@@ -252,6 +223,6 @@
     </aside>
   </div>
 
-  <script src="script.js"></script>
+  <script type="module" src="script.js"></script>
 </body>
 </html>

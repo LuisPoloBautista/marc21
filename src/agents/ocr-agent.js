@@ -16,7 +16,7 @@ export class OcrAgent {
       return { rawText: existingText || '', source: 'text-input' };
     }
 
-    const prompt = buildOcrPrompt(catLang);
+    const prompt = buildOcrPrompt(catLang) + '\nImágenes en orden: ' + images.map((i, n) => '[' + (i.label || `Imagen ${n + 1}`) + ']').join(', ');
     const imageData = images.map(i => i.data);
 
     let lastError = null;

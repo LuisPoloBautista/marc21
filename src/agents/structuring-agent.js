@@ -20,7 +20,7 @@ export class StructuringAgent {
       throw new Error('No text provided for structuring');
     }
 
-    const prompt = buildStructuringPrompt(rawText, catLang, formatType);
+    const prompt = buildStructuringPrompt(rawText, catLang, formatType, opts.missing);
     let lastError = null;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -48,7 +48,7 @@ export class StructuringAgent {
         const validated = validateMetadata(metadata);
         const cleaned = cleanLlmOutput(validated, rawText, { pageCount, formatType });
 
-        if (!cleaned.title && !cleaned.author?.length && !cleaned.publisher) {
+        if (!Object.entries(cleaned).some(([key, value]) => key !== 'evidence' && value && (typeof value === 'string' || Array.isArray(value) && value.length))) {
           lastError = new Error('Structuring produced empty metadata');
           continue;
         }

@@ -1,16 +1,7 @@
-const CURRENT_YEAR = new Date().getFullYear();
-
 export function isYearLike(value) {
   if (!value) return false;
   const clean = value.replace(/[^0-9\s-]/g, '').trim();
   return /^\d{4}\s*-\s*\d{4}$/.test(clean) || /^\d{4}$/.test(clean);
-}
-
-function yearAppearsInSubjects(year, subjects) {
-  if (!year || !Array.isArray(subjects)) return false;
-  const y = year.replace(/[^0-9]/g, '').slice(0, 4);
-  if (!y) return false;
-  return subjects.some(s => String(s).includes(y));
 }
 
 export function normalizeAuthorNames(authors, authorRoles) {
@@ -58,23 +49,11 @@ export function separateChronologicalSubjects(subjects) {
 
 export function normalizeMarcData(metadata, opts = {}) {
   if (!metadata || typeof metadata !== 'object') return metadata;
-  const formatType = opts.formatType || 'book';
-  const isThesis = formatType === 'thesis';
   const result = { ...metadata };
 
   const { authors, authorRoles } = normalizeAuthorNames(result.author, result.authorRoles);
   result.author = authors;
   result.authorRoles = authorRoles;
-
-  if (result.year) {
-    const yearStr = String(result.year).replace(/[^0-9]/g, '').slice(0, 4);
-    if (yearStr && yearAppearsInSubjects(yearStr, result.subjects)) {
-      result.year = isThesis ? String(CURRENT_YEAR - 5) : '';
-    }
-  }
-  if (isThesis && !result.year) {
-    result.year = String(CURRENT_YEAR - 5);
-  }
 
   const { topical, chronological } = separateChronologicalSubjects(result.subjects);
   result.subjects = topical;
@@ -84,9 +63,8 @@ export function normalizeMarcData(metadata, opts = {}) {
 }
 
 export function buildChronologicalField(subject, catLang) {
-  const ind2 = catLang === 'spa' ? '7' : '4';
+  const ind2 = '4';
   const field = { ind1: ' ', ind2, a: subject };
-  if (catLang === 'spa') field['2'] = 'embnm';
   return field;
 }
 
