@@ -26,6 +26,16 @@ export class MetricsStore {
       this.state = JSON.parse(fs.readFileSync(file,'utf8'));
       if (this.state.libraryId !== libraryId || !Number.isSafeInteger(this.state.completed) || !Array.isArray(this.state.recent)) throw new Error('El archivo de métricas no corresponde a esta biblioteca o es inválido.');
     }
+    // Older files only retained usage by request in the last 100 entries.
+    // Recover that known subset without presenting it as full historical usage.
+    if (!this.state.bookUsage) {
+      const books = this.state.recent.filter(r => r.format === 'book' && r.status === 'completed');
+      this.state.bookUsage = books.reduce((sum, r) => ({
+        count:sum.count+1, inputTokens:sum.inputTokens+r.inputTokens,
+        outputTokens:sum.outputTokens+r.outputTokens,
+        unreportedCalls:sum.unreportedCalls+(r.unreportedCalls || 0)
+      }), {count:0,inputTokens:0,outputTokens:0,unreportedCalls:0});
+    }
   }
   save() {
     fs.mkdirSync(path.dirname(this.file), {recursive:true});
@@ -39,19 +49,31 @@ export class MetricsStore {
     this.save(); // Check storage before spending tokens.
     const id = randomUUID(); this.pending.add(id); return id;
   }
-  finish(id, {success, format, usage}) {
+  finish(id, {success, format, usage, title}) {
     if (!this.pending.has(id)) return;
     const before = structuredClone(this.state);
     if (success) { this.state.completed++; this.state.byType[format] = (this.state.byType[format] || 0)+1; }
     else this.state.failed++;
+    if (success && format === 'book') {
+      this.state.bookUsage.count++;
+      this.state.bookUsage.inputTokens += usage.inputTokens;
+      this.state.bookUsage.outputTokens += usage.outputTokens;
+      this.state.bookUsage.unreportedCalls += usage.unreportedCalls;
+    }
     for (const key of Object.keys(newUsage())) this.state[key] += usage[key];
-    this.state.recent.unshift({id, date:new Date().toISOString(), format, status:success ? 'completed':'failed', ...usage});
+    this.state.recent.unshift({id, title: typeof title === 'string' ? title.slice(0,500) : '', date:new Date().toISOString(), format, status:success ? 'completed':'failed', ...usage});
     this.state.recent = this.state.recent.slice(0,100);
     try { this.save(); this.pending.delete(id); }
     catch (error) { this.state = before; throw error; }
   }
   snapshot() {
-    return {...this.state, libraryName:this.libraryName, limit:this.limit, inProgress:this.pending.size,
+    const books = this.state.bookUsage;
+    const bookTotal = books.inputTokens+books.outputTokens;
+    return {...this.state,
+      bookTokens:bookTotal,
+      averageTokensPerBook:books.count ? Math.round(bookTotal/books.count) : null,
+      bookUsageComplete:books.count === (this.state.byType.book || 0) && books.unreportedCalls === 0,
+      libraryName:this.libraryName, limit:this.limit, inProgress:this.pending.size,
       remaining:this.limit === null ? null : Math.max(0,this.limit-this.state.completed-this.pending.size),
       totalTokens:this.state.inputTokens+this.state.outputTokens};
   }

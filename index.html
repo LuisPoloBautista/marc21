@@ -81,9 +81,13 @@
             <div class="metrics-grid">
               <div><span>Registros generados</span><strong id="metricsCompleted">—</strong></div>
               <div><span>Libros generados</span><strong id="metricsBooks">—</strong></div>
-              <div><span>Tokens reportados</span><strong id="metricsTokens">—</strong></div>
+              <div><span>Tokens totales · todos los materiales</span><strong id="metricsTokens">—</strong></div>
+              <div><span>Tokens de libros generados</span><strong id="metricsBookTokens">—</strong></div>
+              <div><span>Promedio de tokens por libro</span><strong id="metricsBookAverage">—</strong></div>
             </div>
             <p id="metricsTokenDetail"></p>
+            <p id="metricsBookCoverage" class="upload-help"></p>
+            <p class="upload-help"><strong>Entrada:</strong> tokens del texto, instrucciones e imágenes procesados por el modelo. <strong>Salida:</strong> tokens generados por el modelo (incluido razonamiento si lo reporta como salida). <strong>Total:</strong> entrada + salida. La entrada en caché ya forma parte de entrada; no se suma otra vez. Son tokens, no palabras ni un importe monetario.</p>
             <p id="metricsLimit">Consultando cuota…</p>
             <progress id="metricsQuota" max="1" value="0" aria-label="Uso de la cuota" hidden></progress>
             <p id="metricsStatus" role="status"></p>
@@ -92,7 +96,7 @@
             <button type="button" id="refreshMetrics" class="btn-secondary">Actualizar métricas</button>
             <div class="verification-scroll"><table class="verification-table">
               <caption>Últimas generaciones</caption>
-              <thead><tr><th>Fecha</th><th>Material</th><th>Estado</th><th>Tokens</th><th>ID de seguimiento</th></tr></thead>
+              <thead><tr><th>Fecha</th><th>Título</th><th>Material</th><th>Estado</th><th>Entrada</th><th>Salida</th><th>Total de tokens</th><th>ID de seguimiento</th></tr></thead>
               <tbody id="metricsRecent"></tbody>
             </table></div>
           </div>

@@ -772,6 +772,9 @@ async function refreshMetrics() {
     document.getElementById('metricsCompleted').textContent = number(data.completed);
     document.getElementById('metricsBooks').textContent = number(data.byType.book);
     document.getElementById('metricsTokens').textContent = number(data.totalTokens);
+    document.getElementById('metricsBookTokens').textContent = number(data.bookTokens);
+    document.getElementById('metricsBookAverage').textContent = data.averageTokensPerBook === null ? '—' : number(data.averageTokensPerBook);
+    document.getElementById('metricsBookCoverage').textContent = `Promedio calculado sobre ${number(data.bookUsage.count)} libros generados con desglose disponible; excluye otros materiales y solicitudes fallidas.${data.bookUsageComplete ? '' : ' Historial o reporte de uso incompleto: cifras parciales.'}`;
     document.getElementById('metricsTokenDetail').textContent = `Entrada: ${number(data.inputTokens)} · Salida: ${number(data.outputTokens)} · Entrada en caché: ${number(data.cachedTokens)}`;
     document.getElementById('metricsLimit').textContent = data.limit === null ? 'Sin límite configurado' : `${number(data.completed)} / ${number(data.limit)} registros · ${number(data.remaining)} disponibles`;
     const progress = document.getElementById('metricsQuota');
@@ -781,7 +784,7 @@ async function refreshMetrics() {
     const list = document.getElementById('metricsRecent'); list.replaceChildren();
     for (const item of data.recent.slice(0,10)) {
       const row = document.createElement('tr');
-      for (const value of [new Date(item.date).toLocaleString('es-MX'), item.format, item.status === 'completed' ? 'Generado' : 'Fallido', number(item.inputTokens+item.outputTokens), item.id]) {
+      for (const value of [new Date(item.date).toLocaleString('es-MX'), item.title || 'Sin título registrado', item.format === 'book' ? 'Libro' : item.format, item.status === 'completed' ? 'Generado' : 'Fallido', number(item.inputTokens), number(item.outputTokens), number(item.inputTokens+item.outputTokens) + (item.unreportedCalls ? ' (parcial)' : ''), item.id]) {
         const cell = document.createElement('td'); cell.textContent = value; row.append(cell);
       }
       list.append(row);

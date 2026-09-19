@@ -44,3 +44,41 @@ test('demo has no quota; zero quota blocks before processing', () => {
     assert.throws(()=>blocked.reserve(),{status:429});
   } finally { fs.rmSync(temp,{recursive:true,force:true}); }
 });
+
+test('book average excludes failed requests and other materials; totals survive retention and restart', () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(),'marc-book-metrics-'));
+  try {
+    const options = {file:path.join(temp,'metrics.json')};
+    const store = new MetricsStore(options);
+    const finish = (format,success,inputTokens,outputTokens) => store.finish(store.reserve(),{format,success,title:'Prueba',usage:{...newUsage(),inputTokens,outputTokens}});
+    finish('book',true,100,20); finish('book',true,200,40);
+    finish('article',true,1000,100); finish('book',false,10,5);
+    let snapshot = store.snapshot();
+    assert.equal(snapshot.bookTokens,360);
+    assert.equal(snapshot.averageTokensPerBook,180);
+    assert.equal(snapshot.totalTokens,1475);
+    assert.equal(snapshot.bookUsageComplete,true);
+    assert.equal(snapshot.recent[0].title,'Prueba');
+    for (let i=0;i<101;i++) finish('article',true,0,0);
+    snapshot = new MetricsStore(options).snapshot();
+    assert.equal(snapshot.bookTokens,360);
+    assert.equal(snapshot.averageTokensPerBook,180);
+  } finally { fs.rmSync(temp,{recursive:true,force:true}); }
+});
+test('legacy migration labels incomplete book history and does not double count', () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(),'marc-legacy-metrics-'));
+  try {
+    const options = {file:path.join(temp,'metrics.json')};
+    const store = new MetricsStore(options);
+    store.finish(store.reserve(),{success:true,format:'book',usage:{...newUsage(),inputTokens:10,outputTokens:5}});
+    const legacy = JSON.parse(fs.readFileSync(options.file,'utf8'));
+    delete legacy.bookUsage; legacy.byType.book=3; legacy.completed=3;
+    fs.writeFileSync(options.file,JSON.stringify(legacy));
+    const migrated = new MetricsStore(options);
+    assert.equal(migrated.snapshot().bookTokens,15);
+    assert.equal(migrated.snapshot().bookUsage.count,1);
+    assert.equal(migrated.snapshot().bookUsageComplete,false);
+    migrated.save();
+    assert.equal(new MetricsStore(options).snapshot().bookTokens,15);
+  } finally { fs.rmSync(temp,{recursive:true,force:true}); }
+});

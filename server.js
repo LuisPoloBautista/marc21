@@ -107,7 +107,7 @@ app.post('/api/extract-metadata', async (req, res) => {
       pageCount
     });
 
-    metrics.finish(recordId, {success:true, format:formatType || 'book', usage});
+    metrics.finish(recordId, {success:true, format:formatType || 'book', usage, title:structured.metadata.title});
     success = true;
     res.json({ result, source: structured.metadata, metrics: metrics.snapshot() });
 
