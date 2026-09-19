@@ -270,6 +270,7 @@ async function generateMarc() {
       const required = ['title', 'year', ...(format === 'thesis' ? ['institution','degree'] : format === 'article' || format === 'chapter' ? ['hostTitle'] : ['publisher'])];
       const missing = required.filter(k => !data.source[k]);
       if (missing.length && pdfDocument) {
+        try {
         const patterns = { title: /./, year: /copyright|©|public|edici[oó]n|\b(?:19|20)\d{2}\b/i, publisher: /editorial|publisher|publicado|published/i, institution: /universidad|institut/i, degree: /grado|tesis|thesis/i, hostTitle: /revista|journal|ISBN|ISSN/i };
         const terms = new RegExp(missing.map(k => patterns[k].source).join('|'), 'i');
         const extra = await prepareEvidence(selectedPages, terms);
@@ -278,6 +279,9 @@ async function generateMarc() {
           if (!follow.ok) throw new Error((await follow.json()).error);
           const updated = await follow.json();
           Object.assign(data, updated);
+        }
+        } catch (error) {
+          data.warnings = ['No se pudo completar la búsqueda adicional. Se conserva la descripción inicial para revisión. Detalle: ' + error.message];
         }
       }
       if (requestRevision !== inputRevision) throw new Error("Los datos cambiaron durante el análisis. Genera el registro de nuevo.");
@@ -291,6 +295,15 @@ async function generateMarc() {
       setStage('build', 'active');
 
       renderVerification(sourceData);
+      let warning = document.getElementById('extractionWarning');
+      if (!warning) {
+        warning = document.createElement('p');
+        warning.id = 'extractionWarning';
+        warning.setAttribute('role', 'status');
+        document.getElementById('verificationBlock').prepend(warning);
+      }
+      warning.textContent = (data.warnings || []).join(' ');
+      warning.hidden = !warning.textContent;
       document.getElementById('verificationBlock').style.display = 'block';
 
       setProgress(100);

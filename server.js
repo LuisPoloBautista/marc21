@@ -98,11 +98,11 @@ app.post('/api/extract-metadata', async (req, res) => {
       pageCount
     });
 
-    res.json({ result, source: structured.metadata });
+    res.json({ result, source: structured.metadata, warnings: structured.empty ? ['La búsqueda adicional no encontró datos nuevos; se conserva la descripción inicial.'] : [] });
 
   } catch (error) {
     console.error('Error in /api/extract-metadata:', error);
-    res.status(500).json({ error: error.message });
+    res.status(error.code === 'NO_BIBLIOGRAPHIC_EVIDENCE' ? 422 : 500).json({ error: error.message });
   }
 });
 

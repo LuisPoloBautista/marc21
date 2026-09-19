@@ -1,3 +1,4 @@
+import { StructuringAgent } from '../src/agents/structuring-agent.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { selectEvidence, compactEvidence, usableText } from '../src/core/evidence.js';
@@ -74,5 +75,35 @@ test('API includes all OCR batches and verifies source-specific citations', asyn
     assert.equal(calls,5);
     assert.equal(result.source.evidence.publisher.verified,true);
     assert.equal(result.source.evidence.title.verified,false);
+    globalThis.fetch = async () => new Response(JSON.stringify({output_text:'{"year":null,"evidence":{}}'}), {status:200});
+    const follow = await originalFetch(`http://127.0.0.1:${server.address().port}/api/extract-metadata`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:'[Página 20] Sin fecha',format:'book',previous:result.source,missing:['year']})});
+    const preserved = await follow.json();
+    assert.equal(follow.status,200);
+    assert.equal(preserved.source.title,'Prueba');
+    assert.equal(preserved.source.publisher,'Editorial de prueba');
+    assert.equal(preserved.source.evidence.publisher.verified,true);
+    assert.equal(preserved.warnings.length,1);
   } finally { globalThis.fetch=originalFetch; await new Promise(resolve=>server.close(resolve)); }
+});
+
+test('targeted search accepts missing values without retries', async () => {
+  let calls = 0;
+  const agent = new StructuringAgent({generate: async () => { calls++; return {response:'{"year":null,"evidence":{}}'}; }});
+  const result = await agent.structure('Nueva página sin fecha de publicación', {missing:['year']});
+  assert.equal(result.empty, true);
+  assert.equal(result.metadata.year, null);
+  assert.equal(calls, 1);
+});
+test('initial search without evidence reports actionable error without repeated costs', async () => {
+  let calls = 0;
+  const agent = new StructuringAgent({generate: async () => { calls++; return {response:'{"title":null,"author":[],"evidence":{}}'}; }});
+  await assert.rejects(agent.structure('Página sin datos bibliográficos'), {code:'NO_BIBLIOGRAPHIC_EVIDENCE'});
+  assert.equal(calls, 1);
+});
+test('unrecognized nested response is not silently accepted as empty evidence', async () => {
+  let calls = 0;
+  const agent = new StructuringAgent({generate: async () => { calls++; return {response: calls === 1 ? '{"metadata":{"title":"Libro"}}' : '{"title":"Libro"}'}; }});
+  const result = await agent.structure('Libro');
+  assert.equal(result.metadata.title,'Libro');
+  assert.equal(calls,2);
 });
