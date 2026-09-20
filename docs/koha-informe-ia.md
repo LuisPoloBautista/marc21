@@ -1,11 +1,12 @@
-# Informe de registros generados con IA
+# Seguimiento fuera del MARC
 
-En Koha abre **Informes → Crear desde SQL**, pega el contenido de `koha-registros-ia.sql`, guarda con el nombre «Registros generados con IA» y ejecuta. Consulta de solo lectura para Koha con MARC21 almacenado en `biblio_metadata` y MariaDB con `ExtractValue`.
+Se retiró la marca 883 y el informe basado en ella. El archivo SQL actual es un aviso informativo, no un listado de registros IA. No se sustituye por coincidencias de títulos, ISBN o fechas, que no prueban procedencia.
 
-Muestra número bibliográfico, título, autor, fecha de alta en Koha, fecha de generación, biblioteca e identificador UUID del asistente. Indicador 0: generación automática; 1: registro editado en el asistente. No prueba que no haya habido otras modificaciones posteriores en Koha.
+La alternativa es una tabla de auditoría separada del registro MARC, vinculada al `biblionumber`. Debe registrar biblioteca, generación interna, usuario, fecha y evento de guardado confirmado. Un plugin/hook del servidor Koha o una integración autenticada que confirme el guardado debe escribirla; copiar datos al formulario no basta. Los cambios al MARC no borran esa relación; sus permisos, respaldos y permanencia se administran aparte.
 
-Incluye libros y otros materiales marcados, para no depender del código de ítem local. Si necesitas solo libros de un tipo Koha concreto, el código puede variar por biblioteca y no se debe asumir `BK`. El informe no duplica registros por sus ejemplares.
+Estado actual: el asistente conserva las generaciones y tokens en su panel, pero no conoce qué registros llegaron a guardarse en Koha. No hay todavía plugin de auditoría ni tabla instalada. Para implementarlo hay que conocer la versión de Koha y disponer de instalación de plugins o acceso al servidor/API según el mecanismo elegido. IntranetUserJS por sí solo no garantiza auditoría persistente.
 
-Solo identifica registros que conservaron 883 $a/$d/$q/$u al guardarse en Koha. Los registros anteriores a la incorporación de esa marca, o aquellos donde el framework la omitió, no pueden identificarse automáticamente con este informe. Habilita esos subcampos en el framework antes de importar. El UUID de 883 $u permite relacionar el registro con el historial de métricas; los tokens no se guardan dentro de Koha.
+## Mensaje de importación
+001 y 005 se dejan a Koha, sin intentar copiarlos desde el borrador. Para 000 y 008, el script busca también directamente el editor del campo de control cuando no existe un input oculto de código. Si el campo no existe realmente, se informa; no se inventa un control fuera del framework. Los subcampos descriptivos ausentes, como 040 $b, siguen mostrándose para revisión.
 
-El informe está preparado, pero no se ha ejecutado sobre tu base de datos. Referencias: [esquema BiblioMetadata](https://perldoc.koha-community.org/Koha/Schema/Result/BiblioMetadata.html), [informes SQL de Koha](https://koha-community.org/manual/22.05/en/html/reports.html).
+Después de desplegar la aplicación, reemplazar el script de IntranetUserJS por `docs/koha-staff-integration.js`. Los cambios de este archivo no llegan automáticamente a la preferencia Koha.

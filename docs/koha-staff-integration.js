@@ -27,7 +27,7 @@
     if (record.leader) result.push({ tag: "000", value: record.leader });
 
     Object.keys(record).sort().forEach(function (tag) {
-      if (tag === "leader" || !/^\d{3}$/.test(tag) || record[tag] == null) return;
+      if (["leader", "001", "005", "883"].includes(tag) || !/^\d{3}$/.test(tag) || record[tag] == null) return;
       const values = Array.isArray(record[tag]) ? record[tag] : [record[tag]];
       values.forEach(function (value) { result.push({ tag: tag, value: value }); });
     });
@@ -56,9 +56,18 @@
     const codeInput = tagNode.querySelector(
       'input[name^="tag_' + tag + '_code_' + code + '_"]'
     );
-    if (!codeInput) return null;
-    const line = codeInput.closest(".subfield_line") || codeInput.parentElement;
-    return line && line.querySelector(".input_marceditor");
+    if (codeInput) {
+      const line = codeInput.closest(".subfield_line") || codeInput.parentElement;
+      const editor = line && line.querySelector(".input_marceditor");
+      if (editor) return editor;
+    }
+    // Control fields can have no hidden code input. Locate the actual editor
+    // inside this occurrence; never select an indicator or another MARC tag.
+    if (tag === "000" || Number(tag) < 10) {
+      return tagNode.querySelector('input.input_marceditor, textarea.input_marceditor, select.input_marceditor') ||
+        tagNode.querySelector('input[name^="tag_' + tag + '_subfield_"], textarea[name^="tag_' + tag + '_subfield_"], select[name^="tag_' + tag + '_subfield_"]');
+    }
+    return tagNode.querySelector('input.input_marceditor[name^="tag_' + tag + '_subfield_' + code + '_"], textarea.input_marceditor[name^="tag_' + tag + '_subfield_' + code + '_"], select.input_marceditor[name^="tag_' + tag + '_subfield_' + code + '_"]');
   }
 
   function fillOccurrence(item, position, skipped) {
@@ -105,9 +114,9 @@
     closeModal();
     const uniqueSkipped = Array.from(new Set(skipped));
     if (uniqueSkipped.length) {
-      window.alert("Registro importado. Koha omitio:\n\n" + uniqueSkipped.join("\n") + "\n\nRevise el framework MARC antes de guardar.");
+      window.alert("Datos copiados al formulario; aún no guardados. Campos que no se pudieron copiar:\n\n" + uniqueSkipped.join("\n") + "\n\nRevise los campos indicados y el framework MARC antes de guardar. 001 y 005 se dejan a Koha.");
     } else {
-      window.alert("Registro importado en el formulario. Revise los datos y use el boton Guardar de Koha.");
+      window.alert("Datos copiados al formulario. 001 y 005 se dejan a Koha. Revise los datos y use el botón Guardar de Koha.");
     }
   }
 

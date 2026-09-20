@@ -128,5 +128,5 @@ Las reglas de copyright como año alternativo, resumen siempre generado (máximo
 
 ## Panel de métricas y cuota
 El demo no tiene límite. El panel muestra registros generados, libros, tokens de entrada/salida, cuota e historial reciente. Cada despliegue representa una biblioteca y tiene su propio enlace. Configura `LIBRARY_ID`, `LIBRARY_NAME` y opcionalmente `LIBRARY_RECORD_LIMIT` para un límite acumulado de registros. No hay cobro automático ni límite por tokens.
-La marca 883 se conserva en MARCXML y en el envío a Koha, oculta en la vista habitual del asistente. Habilita sus subcampos en el framework Koha para conservarla.
+No se insertan identificadores de IA en el MARC. El identificador de generación permanece en las métricas. Para relacionarlo con guardados en Koha se necesita una integración de auditoría externa al MARC, aún no instalada.
 Consulta [métricas y trazabilidad](docs/metrics-and-tracking.md) para las reglas de conteo, almacenamiento persistente y configuración. En Render gratuito el archivo de métricas es efímero; para conservar el historial usa un disco persistente y `METRICS_FILE`.

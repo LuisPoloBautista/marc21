@@ -98,7 +98,6 @@ app.post('/api/extract-metadata', async (req, res) => {
       const segment = segments.find(m => normalize(m[1]) === normalize(ev.source));
       ev.verified = ev.status === 'observed' && normalize(ev.quote).length >= 4 && !!segment && normalize(segment[2]).includes(normalize(ev.quote));
     }
-    structured.metadata._provenance = { id: recordId, date: new Date().toISOString(), library: metrics.libraryId };
 
     const result = buildMarcRecord(structured.metadata, {
       agency: process.env.CATALOGING_AGENCY || '',

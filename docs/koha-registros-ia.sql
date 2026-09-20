@@ -1,18 +1,6 @@
--- Koha / MariaDB: registros guardados con la marca de este asistente.
--- Pegar en Informes > Crear desde SQL. Solo lectura.
--- Incluye todos los materiales; no depende de códigos locales de tipo de ítem.
-SELECT
-    b.biblionumber,
-    b.title AS titulo,
-    b.author AS autor,
-    b.datecreated AS fecha_alta_koha,
-    ExtractValue(bm.metadata, '//datafield[@tag="883"][subfield[@code="a"]="Catalogación automática MARC21"]/subfield[@code="d"]') AS fecha_generacion_ia,
-    ExtractValue(bm.metadata, '//datafield[@tag="883"][subfield[@code="a"]="Catalogación automática MARC21"]/subfield[@code="q"]') AS biblioteca_generadora,
-    ExtractValue(bm.metadata, '//datafield[@tag="883"][subfield[@code="a"]="Catalogación automática MARC21"]/subfield[@code="u"]') AS identificador_ia,
-    ExtractValue(bm.metadata, '//datafield[@tag="883"][subfield[@code="a"]="Catalogación automática MARC21"]/@ind1') AS indicador_procedencia
-FROM biblio AS b
-INNER JOIN biblio_metadata AS bm ON bm.biblionumber = b.biblionumber
-WHERE bm.format = 'marcxml'
-  AND bm.schema = 'MARC21'
-  AND ExtractValue(bm.metadata, 'count(//datafield[@tag="883"][subfield[@code="a"]="Catalogación automática MARC21"])') > 0
-ORDER BY b.biblionumber DESC
+-- Informe anterior retirado: ya no se introduce una marca de IA en MARC.
+-- Esta consulta informativa no identifica registros ni modifica datos.
+-- Para un informe real se necesita una tabla de auditoría externa al MARC,
+-- alimentada al confirmar el guardado en Koha y vinculada a biblionumber.
+-- Esa tabla/integración todavía no está instalada.
+SELECT 'Informe de IA pendiente: se requiere auditoría de guardado vinculada a biblionumber, fuera del MARC.' AS estado

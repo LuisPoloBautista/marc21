@@ -23,15 +23,9 @@ El archivo usa escritura temporal y renombrado. Las reservas de cuota evitan sob
 ## Permanencia en Render
 El blueprint del demo sigue usando el plan gratuito. [Render usa almacenamiento efímero por defecto](https://render.com/docs/disks): el historial puede perderse en reinicios/despliegues. Para una biblioteca comercial, montar un disco persistente y configurar `METRICS_FILE`. Los discos requieren un servicio de pago; el código no contrata ni activa uno automáticamente.
 
-## Marca MARC
-Cada generación lleva un UUID, fecha y biblioteca en `_provenance` del JSON y en [MARC 883, procedencia de metadatos](https://www.loc.gov/marc/bibliographic/bd883.html):
-- $a: Catalogación automática MARC21.
-- $d: fecha YYYYMMDD.
-- $q: biblioteca generadora.
-- $u: urn:uuid:identificador.
-
-Se genera en código, sin tokens adicionales del modelo. Se omite de las vistas normales y de edición del asistente, pero se conserva en MARCXML y en el envío al formulario Koha. Si se edita el registro se conserva la marca con indicador de generación parcial. Es procedencia, no firma criptográfica ni protección contra alteraciones.
-Koha debe tener 883 y sus subcampos habilitados en el framework; de lo contrario la integración informa campos omitidos. Ocultarlo en la vista pública de Koha requiere configurar ese framework/presentación. No se puede garantizar ocultación en Koha desde este sitio externo. No usar la marca como confirmación de que Koha guardó el registro.
+## Seguimiento interno, sin marca MARC
+El UUID permanece únicamente en el historial de métricas del asistente. No se añade a campos MARC ni se envía como marca bibliográfica a Koha. El panel mide generaciones, no guardados confirmados en Koha. El informe anterior basado en 883 queda retirado.
+Para vincular generaciones a registros guardados hace falta una auditoría externa al MARC alimentada al confirmar el guardado. Esa integración aún no está instalada; véase [seguimiento fuera del MARC](koha-informe-ia.md).
 
 ## Tokens por libro
 El panel muestra total general (todos los materiales y fallos), tokens de libros generados y promedio por libro. Este promedio divide los tokens reportados de generaciones exitosas de tipo `book` entre el número de esos libros con desglose disponible. No incluye artículos, tesis, capítulos, memorias ni fallos. La tabla presenta título, entrada, salida y total de cada generación reciente.
@@ -39,4 +33,4 @@ Al abrir un historial antiguo sin acumulador por libro se recupera el desglose d
 
 Ejemplo: entrada 12,364 + salida 5,700 = 18,064 tokens en total. No son palabras ni dinero. El desglose de entrada en caché es parte de entrada, no un gasto adicional que sumar al total.
 
-Para localizar los registros ya guardados en Koha, consulta [el informe SQL](koha-informe-ia.md).
+Consulta el [estado de la auditoría en Koha](koha-informe-ia.md).
