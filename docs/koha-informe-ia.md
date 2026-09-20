@@ -1,12 +1,17 @@
-# Seguimiento fuera del MARC
+# Informe de registros generados con IA y catalogador
 
-Se retiró la marca 883 y el informe basado en ella. El archivo SQL actual es un aviso informativo, no un listado de registros IA. No se sustituye por coincidencias de títulos, ISBN o fechas, que no prueban procedencia.
+En Koha, Informes → Crear desde SQL: pegar `koha-registros-ia.sql`, guardar y ejecutar. Consulta de solo lectura para MariaDB/Koha MARC21; no se ha ejecutado sobre tu instalación.
 
-La alternativa es una tabla de auditoría separada del registro MARC, vinculada al `biblionumber`. Debe registrar biblioteca, generación interna, usuario, fecha y evento de guardado confirmado. Un plugin/hook del servidor Koha o una integración autenticada que confirme el guardado debe escribirla; copiar datos al formulario no basta. Los cambios al MARC no borran esa relación; sus permisos, respaldos y permanencia se administran aparte.
+Identifica registros por 883 $a = Catalogación automática MARC21, mostrando título, autor, fecha, biblioteca e identificador de generación. Habilitar 883 $a/$d/$q/$u en el framework. El script conserva 001 y 005 de Koha y permite importar 883.
 
-Estado actual: el asistente conserva las generaciones y tokens en su panel, pero no conoce qué registros llegaron a guardarse en Koha. No hay todavía plugin de auditoría ni tabla instalada. Para implementarlo hay que conocer la versión de Koha y disponer de instalación de plugins o acceso al servidor/API según el mecanismo elegido. IntranetUserJS por sí solo no garantiza auditoría persistente.
+## Catalogador
+`catalogador_de_alta` se obtiene del primer evento CATALOGUING / ADD con info=biblio en action_logs, enlazando user con borrowers.borrowernumber. Excluir eventos de ejemplares evita confundir itemnumber con biblionumber. El informe conserva los registros aunque no haya log o el usuario ya no exista.
 
-## Mensaje de importación
-001 y 005 se dejan a Koha, sin intentar copiarlos desde el borrador. Para 000 y 008, el script busca también directamente el editor del campo de control cuando no existe un input oculto de código. Si el campo no existe realmente, se informa; no se inventa un control fuera del framework. Los subcampos descriptivos ausentes, como 040 $b, siguen mostrándose para revisión.
+CataloguingLog debe haber estado activo y el historial conservarse. Si falta, aparece «No disponible en el historial»; habilitar logs ahora no recupera eventos pasados. El nombre es el actual de la cuenta, no una copia histórica.
 
-Después de desplegar la aplicación, reemplazar el script de IntranetUserJS por `docs/koha-staff-integration.js`. Los cambios de este archivo no llegan automáticamente a la preferencia Koha.
+En registros nuevos es el usuario que dio de alta el registro en Koha. Si el asistente se usó para modificar un registro existente, no prueba quién incorporó la IA: muestra el creador original. No confundirlo con el último modificador. La marca MARC sigue siendo editable y depende de su conservación.
+
+Referencias: [action_logs](https://schema.koha-community.org/22_11/tables/action_logs.html), [CataloguingLog](https://koha-community.org/manual/22.11/en/html/logspreferences.html).
+
+## Instalación de la interfaz
+Reemplazar IntranetUserJS por el contenido actualizado de `docs/koha-staff-integration.js`. Incluye icono de estrellas SVG sin dependencias y botón Ampliar ventana / Restaurar tamaño. Desplegar también el backend y frontend para que vuelvan a generar y exportar 883. El script de Koha por sí solo no genera esa marca.

@@ -10,9 +10,9 @@ function helpers(document = {}) {
   vm.runInNewContext(fragment+';globalThis.helpers={occurrences,editorForSubfield};',context);
   return context.helpers;
 }
-test('Koha import excludes managed control fields and obsolete AI marker', () => {
+test('Koha import excludes managed control fields and includes 883', () => {
   const rows = helpers().occurrences({leader:'leader','001':'id','005':'date','008':'data','245':{a:'Title'},'883':{u:'old-id'}});
-  assert.equal(Array.from(rows,r=>r.tag).join(','),'000,008,245');
+  assert.equal(Array.from(rows,r=>r.tag).join(','),'000,008,245,883');
 });
 test('000 and 008 can use their actual editor without a hidden code input', () => {
   const editor = {value:''};

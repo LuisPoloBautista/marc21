@@ -513,7 +513,7 @@ function downloadMarc() {
   if (marcData['005']) xml += `  <controlfield tag="005">${escapeXml(marcData['005'])}</controlfield>\n`;
   if (marcData['008']) xml += `  <controlfield tag="008">${escapeXml(marcData['008'])}</controlfield>\n`;
 
-  const dataFields = ['020', '022', '024', '040', '041', '050', '082', '100', '111', '245', '250', '260', '264', '300', '336', '337', '338', '490', '500', '502', '504', '520', '600', '648', '650', '700', '710', '711', '773', '856'];
+  const dataFields = ['020', '022', '024', '040', '041', '050', '082', '100', '111', '245', '250', '260', '264', '300', '336', '337', '338', '490', '500', '502', '504', '520', '600', '648', '650', '700', '710', '711', '773', '856', '883'];
 
   for (const tag of dataFields) {
     if (marcData[tag]) {
@@ -544,7 +544,7 @@ function importMarcIntoKoha() {
     const editor = document.getElementById("marcEditor");
     if (editor) {
       try {
-        marcData = parseRawMarc(editor.value);
+        marcData = { ...parseRawMarc(editor.value), ...(marcData['883'] ? { '883': { ...marcData['883'], ind1: '1' } } : {}) };
       } catch (error) {
         alert("No se puede importar: revisa el formato del registro editado.");
         return;
@@ -582,7 +582,7 @@ function toggleEditMode() {
     const editor = document.getElementById("marcEditor");
     const rawText = editor.value;
     try {
-      marcData = parseRawMarc(rawText);
+      marcData = { ...parseRawMarc(rawText), ...(marcData['883'] ? { '883': { ...marcData['883'], ind1: '1' } } : {}) };
       renderMarc(marcData);
       editBtn.textContent = "Editar";
     } catch (e) {

@@ -85,13 +85,13 @@ test('API includes all OCR batches and verifies source-specific citations', asyn
     assert.equal(result.metrics.inputTokens,300);
     assert.equal(result.metrics.outputTokens,60);
     assert.equal(result.metrics.cachedTokens,30);
-    assert.equal(result.result['883'],undefined);
-    assert.equal(result.source._provenance,undefined);
+    assert.match(result.result['883'].u,/^urn:uuid:/);
+    assert.ok(result.source._provenance.id);
     assert.ok(result.metrics.recent[0].id);
     const base = `http://127.0.0.1:${server.address().port}`;
     const send = (endpoint, body) => originalFetch(base+endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const reformatted = await send('/api/format',{source:result.source});
-    assert.equal((await reformatted.json()).result['883'],undefined);
+    assert.deepEqual((await reformatted.json()).result['883'],result.result['883']);
     assert.equal((await send('/api/extract-metadata',{text:'Nuevo libro'})).status,429);
     assert.equal((await send('/api/extract-metadata',{text:'Libro',images:Array.from({length:6},()=>({data:'x'}))})).status,400);
     assert.equal((await send('/api/extract-metadata',{text:'Libro',previous:result.source,missing:['year']})).status,400);
@@ -148,8 +148,8 @@ test('Dewey is a subject-based proposal; LC is removed from metadata and MARC', 
   assert.equal(cleanLlmOutput({dewey:'370',subjects:[]},'').dewey,null);
 });
 
-test('legacy provenance does not introduce AI markers into MARC', () => {
+test('provenance generates the requested 883 marker', () => {
   const marc = buildMarcRecord({title:'Libro',_provenance:{id:'old-id',date:'2026-01-01',library:'demo'}});
-  assert.equal(marc['883'],undefined);
-  assert.ok(!JSON.stringify(marc).includes('old-id'));
+  assert.equal(marc['883'].u,'urn:uuid:old-id');
+  assert.equal(marc['883'].a,'Catalogación automática MARC21');
 });

@@ -23,9 +23,9 @@ El archivo usa escritura temporal y renombrado. Las reservas de cuota evitan sob
 ## Permanencia en Render
 El blueprint del demo sigue usando el plan gratuito. [Render usa almacenamiento efímero por defecto](https://render.com/docs/disks): el historial puede perderse en reinicios/despliegues. Para una biblioteca comercial, montar un disco persistente y configurar `METRICS_FILE`. Los discos requieren un servicio de pago; el código no contrata ni activa uno automáticamente.
 
-## Seguimiento interno, sin marca MARC
-El UUID permanece únicamente en el historial de métricas del asistente. No se añade a campos MARC ni se envía como marca bibliográfica a Koha. El panel mide generaciones, no guardados confirmados en Koha. El informe anterior basado en 883 queda retirado.
-Para vincular generaciones a registros guardados hace falta una auditoría externa al MARC alimentada al confirmar el guardado. Esa integración aún no está instalada; véase [seguimiento fuera del MARC](koha-informe-ia.md).
+## Seguimiento mediante 883
+Cada generación conserva un UUID en métricas y lo incluye en 883 $u como urn:uuid. $a identifica al asistente, $d contiene fecha de generación y $q la biblioteca. El campo se conserva en MARCXML y se copia a Koha, aunque se omite de la vista habitual del asistente. Al editar en el asistente se mantiene con indicador de generación parcial.
+El framework Koha debe permitir 883 $a/$d/$q/$u. El [informe SQL](koha-informe-ia.md) localiza esa marca y muestra el catalogador de alta cuando el historial lo permite. El campo es editable y no sustituye una auditoría inmutable. Las métricas cuentan generaciones, no guardados confirmados en Koha.
 
 ## Tokens por libro
 El panel muestra total general (todos los materiales y fallos), tokens de libros generados y promedio por libro. Este promedio divide los tokens reportados de generaciones exitosas de tipo `book` entre el número de esos libros con desglose disponible. No incluye artículos, tesis, capítulos, memorias ni fallos. La tabla presenta título, entrada, salida y total de cada generación reciente.

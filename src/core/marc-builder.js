@@ -361,5 +361,11 @@ export function buildMarcRecord(metadata, opts = {}) {
     }
   }
 
+  const provenance = metadata._provenance;
+  if (provenance?.id && provenance?.date) {
+    data['883'] = { ind1: '0', ind2: ' ', a: 'Catalogación automática MARC21',
+      d: provenance.date.slice(0,10).replace(/-/g,''), q: provenance.library,
+      u: 'urn:uuid:' + provenance.id };
+  }
   return data;
 }
