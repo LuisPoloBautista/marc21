@@ -49,7 +49,7 @@ test('preserves material-specific metadata and analytic pagination', () => {
   assert.ok(buildStructuringPrompt('', 'spa','thesis').includes('degree, institution, advisor'));
   assert.ok(!buildStructuringPrompt('', 'spa','book').split('Valores:')[0].includes('hostTitle'));
 });
-test('API includes all OCR batches and verifies source-specific citations', async () => {
+test('API includes all images in one OCR call and verifies source-specific citations', async () => {
   const originalFetch = globalThis.fetch;
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'marc-api-test-'));
   process.env.METRICS_FILE = path.join(temp, 'metrics.json');
@@ -64,6 +64,8 @@ test('API includes all OCR batches and verifies source-specific citations', asyn
     calls++;
     let response;
     if (content.some(c=>c.type==='input_image')) {
+      assert.equal(content.filter(c=>c.type==='input_image').length,5);
+      assert.ok(content.filter(c=>c.type==='input_image').every(c=>c.detail==='high'));
       const labels = prompt.split('Imágenes en orden: ')[1];
       response = labels.split(', ').map(label=>label+'\nEditorial de prueba').join('\n');
     } else {
@@ -78,13 +80,18 @@ test('API includes all OCR batches and verifies source-specific citations', asyn
     const response = await originalFetch(`http://127.0.0.1:${server.address().port}/api/extract-metadata`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({format:'book',images:Array.from({length:5},(_,i)=>({label:`Imagen ${i+1}`,data:'aGVsbG8='}))})});
     const result = await response.json();
     assert.equal(response.status,200,JSON.stringify(result));
-    assert.equal(calls,3);
+    assert.equal(calls,2);
     assert.equal(result.source.evidence.publisher.verified,true);
     assert.equal(result.source.evidence.title.verified,false);
     assert.equal(result.metrics.completed,1);
-    assert.equal(result.metrics.inputTokens,300);
-    assert.equal(result.metrics.outputTokens,60);
-    assert.equal(result.metrics.cachedTokens,30);
+    assert.equal(result.metrics.inputTokens,200);
+    assert.equal(result.metrics.outputTokens,40);
+    assert.equal(result.metrics.cachedTokens,20);
+    assert.equal(result.metrics.averageInputTokensPerBook,200);
+    assert.equal(result.metrics.averageOutputTokensPerBook,40);
+    assert.equal(result.metrics.booksWithOcr,1);
+    assert.equal(result.metrics.ocrBookRate,1);
+    assert.equal(result.metrics.retryRate,0);
     assert.match(result.result['883'].u,/^urn:uuid:/);
     assert.ok(result.source._provenance.id);
     assert.ok(result.metrics.recent[0].id);
@@ -98,9 +105,9 @@ test('API includes all OCR batches and verifies source-specific citations', asyn
     assert.equal((await send('/api/ocr',{images:[{data:'x'}]})).status,410);
     const snapshot = await (await originalFetch(base+'/api/metrics')).json();
     assert.equal(snapshot.completed,1);
-    assert.equal(snapshot.totalTokens,360);
+    assert.equal(snapshot.totalTokens,240);
     assert.equal(snapshot.remaining,0);
-    assert.equal(calls,3);
+    assert.equal(calls,2);
   } finally { globalThis.fetch=originalFetch; await new Promise(resolve=>server.close(resolve)); fs.rmSync(temp,{recursive:true,force:true}); }
 });
 
@@ -110,12 +117,11 @@ test('initial search without evidence reports actionable error without repeated 
   await assert.rejects(agent.structure('Página sin datos bibliográficos'), {code:'NO_BIBLIOGRAPHIC_EVIDENCE'});
   assert.equal(calls, 1);
 });
-test('unrecognized nested response is not silently accepted as empty evidence', async () => {
+test('unrecognized nested response fails without retrying', async () => {
   let calls = 0;
-  const agent = new StructuringAgent({generate: async () => { calls++; return {response: calls === 1 ? '{"metadata":{"title":"Libro"}}' : '{"title":"Libro"}'}; }});
-  const result = await agent.structure('Libro');
-  assert.equal(result.metadata.title,'Libro');
-  assert.equal(calls,2);
+  const agent = new StructuringAgent({generate: async () => { calls++; return {response:'{"metadata":{"title":"Libro"}}'}; }});
+  await assert.rejects(agent.structure('Libro'), /Failed to parse JSON/);
+  assert.equal(calls,1);
 });
 
 test('copyright year fills missing year without replacing publication year', () => {

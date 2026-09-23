@@ -1,5 +1,8 @@
 import { reportUsage } from './metrics.js';
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
+export const MAX_IMAGES_PER_REQUEST = 5;
+export const MAX_IMAGE_INPUT_TOKENS_PER_IMAGE = 3000;
+export const MAX_IMAGE_INPUT_TOKENS = MAX_IMAGES_PER_REQUEST * MAX_IMAGE_INPUT_TOKENS_PER_IMAGE;
 
 function createTimeoutSignal(signal, timeoutMs) {
   const controller = new AbortController();
@@ -40,12 +43,17 @@ export class OpenAiClient {
     }
 
     const timeout = createTimeoutSignal(signal, this.timeoutMs);
+    if (images.length > MAX_IMAGES_PER_REQUEST) {
+      throw new Error(`Máximo ${MAX_IMAGES_PER_REQUEST} imágenes por llamada (${MAX_IMAGE_INPUT_TOKENS} tokens visuales presupuestados).`);
+    }
     const content = [{ type: 'input_text', text: prompt || '' }];
 
     for (const image of images) {
       content.push({
         type: 'input_image',
-        image_url: image.startsWith('data:') ? image : `data:image/jpeg;base64,${image}`
+        image_url: image.startsWith('data:') ? image : `data:image/jpeg;base64,${image}`,
+        // GPT-5.5 high detail is capped at 2,500 patches × 1.2 = 3,000 image tokens.
+        detail: 'high'
       });
     }
 

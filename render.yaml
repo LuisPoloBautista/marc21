@@ -2,7 +2,7 @@ services:
   - type: web
     name: marc21-generator
     env: node
-    plan: free
+    plan: starter
     buildCommand: npm install
     startCommand: npm start
     envVars:
@@ -18,3 +18,9 @@ services:
         value: demo
       - key: LIBRARY_NAME
         value: Biblioteca demo
+      - key: METRICS_FILE
+        value: /var/data/metrics.json
+    disk:
+      name: metrics-data
+      mountPath: /var/data
+      sizeGB: 1

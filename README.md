@@ -44,10 +44,11 @@ Variables disponibles:
 | `OPENAI_MODEL` | `gpt-5.5` | Modelo usado por defecto para OCR y estructuracion. |
 | `OPENAI_OCR_MODEL` | `OPENAI_MODEL` | Modelo para imagenes/PDF renderizados. Debe soportar vision. |
 | `OPENAI_STRUCTURING_MODEL` | `OPENAI_MODEL` | Modelo para extraer metadata JSON del texto. |
+| `METRICS_FILE` | `.data/metrics.json` | Archivo de métricas; en producción debe estar dentro de almacenamiento persistente. |
 | `PORT` | `3000` | Puerto local o asignado por el host. |
 | `ALLOWED_ORIGINS` | `*` | Origenes permitidos para CORS, separados por coma. |
 
-## Despliegue gratuito recomendado: Render
+## Despliegue persistente recomendado: Render
 
 Este repositorio incluye `render.yaml`.
 
@@ -57,7 +58,7 @@ Este repositorio incluye `render.yaml`.
 4. Mantén `OPENAI_MODEL=gpt-5.5` o cambia el modelo segun tu cuenta.
 5. Deploy.
 
-Render servira frontend y backend desde el mismo dominio, asi que no necesitas configurar GitHub Pages.
+El blueprint usa un servicio `starter` y un disco persistente para conservar métricas entre reinicios y despliegues. Esto genera cargos en Render. Render servira frontend y backend desde el mismo dominio, asi que no necesitas configurar GitHub Pages.
 
 ## GitHub Pages
 

@@ -33,9 +33,12 @@ export class MetricsStore {
       this.state.bookUsage = books.reduce((sum, r) => ({
         count:sum.count+1, inputTokens:sum.inputTokens+r.inputTokens,
         outputTokens:sum.outputTokens+r.outputTokens,
-        unreportedCalls:sum.unreportedCalls+(r.unreportedCalls || 0)
-      }), {count:0,inputTokens:0,outputTokens:0,unreportedCalls:0});
+        unreportedCalls:sum.unreportedCalls+(r.unreportedCalls || 0),
+        ocrCount:sum.ocrCount+(r.usedOcr ? 1 : 0)
+      }), {count:0,inputTokens:0,outputTokens:0,unreportedCalls:0,ocrCount:0});
     }
+    this.state.bookUsage.ocrCount ??= 0;
+    this.state.retryAttempts ??= 0;
   }
   save() {
     fs.mkdirSync(path.dirname(this.file), {recursive:true});
@@ -49,7 +52,7 @@ export class MetricsStore {
     this.save(); // Check storage before spending tokens.
     const id = randomUUID(); this.pending.add(id); return id;
   }
-  finish(id, {success, format, usage, title}) {
+  finish(id, {success, format, usage, title, usedOcr=false}) {
     if (!this.pending.has(id)) return;
     const before = structuredClone(this.state);
     if (success) { this.state.completed++; this.state.byType[format] = (this.state.byType[format] || 0)+1; }
@@ -59,9 +62,10 @@ export class MetricsStore {
       this.state.bookUsage.inputTokens += usage.inputTokens;
       this.state.bookUsage.outputTokens += usage.outputTokens;
       this.state.bookUsage.unreportedCalls += usage.unreportedCalls;
+      if (usedOcr) this.state.bookUsage.ocrCount++;
     }
     for (const key of Object.keys(newUsage())) this.state[key] += usage[key];
-    this.state.recent.unshift({id, title: typeof title === 'string' ? title.slice(0,500) : '', date:new Date().toISOString(), format, status:success ? 'completed':'failed', ...usage});
+    this.state.recent.unshift({id, title: typeof title === 'string' ? title.slice(0,500) : '', date:new Date().toISOString(), format, usedOcr:Boolean(usedOcr), status:success ? 'completed':'failed', ...usage});
     this.state.recent = this.state.recent.slice(0,100);
     try { this.save(); this.pending.delete(id); }
     catch (error) { this.state = before; throw error; }
@@ -69,9 +73,16 @@ export class MetricsStore {
   snapshot() {
     const books = this.state.bookUsage;
     const bookTotal = books.inputTokens+books.outputTokens;
+    const attempts = this.state.completed + this.state.failed;
     return {...this.state,
       bookTokens:bookTotal,
       averageTokensPerBook:books.count ? Math.round(bookTotal/books.count) : null,
+      averageInputTokensPerBook:books.count ? Math.round(books.inputTokens/books.count) : null,
+      averageOutputTokensPerBook:books.count ? Math.round(books.outputTokens/books.count) : null,
+      booksWithOcr:books.ocrCount,
+      ocrBookRate:books.count ? books.ocrCount/books.count : null,
+      retryRate:attempts ? this.state.retryAttempts/attempts : 0,
+      failureRate:attempts ? this.state.failed/attempts : 0,
       bookUsageComplete:books.count === (this.state.byType.book || 0) && books.unreportedCalls === 0,
       libraryName:this.libraryName, limit:this.limit, inProgress:this.pending.size,
       remaining:this.limit === null ? null : Math.max(0,this.limit-this.state.completed-this.pending.size),

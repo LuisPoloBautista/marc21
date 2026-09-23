@@ -1,9 +1,7 @@
 import { buildOcrPrompt } from '../core/prompt-builder.js';
 import { parseRawOcrText } from '../core/llm-parser.js';
-import { sleep } from '../utils/helpers.js';
 
 const OCR_MODEL = process.env.OPENAI_OCR_MODEL || process.env.OPENAI_MODEL || 'gpt-5.5';
-const MAX_RETRIES = 2;
 const TIMEOUT_MS = 120000;
 
 export class OcrAgent {
@@ -19,12 +17,10 @@ export class OcrAgent {
     const prompt = buildOcrPrompt(catLang) + '\nImágenes en orden: ' + images.map((i, n) => '[' + (i.label || `Imagen ${n + 1}`) + ']').join(', ');
     const imageData = images.map(i => i.data);
 
-    let lastError = null;
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
+    try {
         const response = await this.llm.generate({
           model: OCR_MODEL,
           prompt,
@@ -33,18 +29,14 @@ export class OcrAgent {
           signal: controller.signal
         });
 
-        clearTimeout(timeoutId);
-
         const rawText = response.response || '';
         if (!rawText.trim()) {
-          lastError = new Error('OCR agent returned empty response');
-          continue;
+          throw new Error('OCR agent returned empty response');
         }
 
         const cleaned = parseRawOcrText(rawText);
         if (!cleaned || cleaned.length < 10) {
-          lastError = new Error('OCR agent returned insufficient text');
-          continue;
+          throw new Error('OCR agent returned insufficient text');
         }
 
         let combinedText = cleaned;
@@ -60,25 +52,21 @@ export class OcrAgent {
         };
 
       } catch (error) {
-        lastError = error;
-        if (attempt < MAX_RETRIES) {
-          await sleep(1000 * (attempt + 1));
-        }
-      }
-    }
-
     if (existingText && existingText.trim()) {
       return {
         rawText: existingText,
         source: 'text-input-fallback',
-        error: lastError.message
+        error: error.message
       };
     }
 
-    const isModelError = lastError.message && (lastError.message.includes('model') || lastError.message.includes('not found'));
+    const isModelError = error.message && (error.message.includes('model') || error.message.includes('not found'));
     const hint = isModelError
       ? `. Verifica que tu cuenta de OpenAI tenga acceso al modelo ${OCR_MODEL} o define OPENAI_OCR_MODEL con otro modelo compatible con vision.`
       : '';
-    throw new Error(`OCR Agent failed after ${MAX_RETRIES + 1} attempts: ${lastError.message}${hint}`);
+    throw new Error(`OCR Agent failed: ${error.message}${hint}`);
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 }

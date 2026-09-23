@@ -50,12 +50,18 @@ test('book average excludes failed requests and other materials; totals survive 
   try {
     const options = {file:path.join(temp,'metrics.json')};
     const store = new MetricsStore(options);
-    const finish = (format,success,inputTokens,outputTokens) => store.finish(store.reserve(),{format,success,title:'Prueba',usage:{...newUsage(),inputTokens,outputTokens}});
-    finish('book',true,100,20); finish('book',true,200,40);
+    const finish = (format,success,inputTokens,outputTokens,usedOcr=false) => store.finish(store.reserve(),{format,success,title:'Prueba',usedOcr,usage:{...newUsage(),inputTokens,outputTokens}});
+    finish('book',true,100,20,true); finish('book',true,200,40);
     finish('article',true,1000,100); finish('book',false,10,5);
     let snapshot = store.snapshot();
     assert.equal(snapshot.bookTokens,360);
     assert.equal(snapshot.averageTokensPerBook,180);
+    assert.equal(snapshot.averageInputTokensPerBook,150);
+    assert.equal(snapshot.averageOutputTokensPerBook,30);
+    assert.equal(snapshot.booksWithOcr,1);
+    assert.equal(snapshot.ocrBookRate,0.5);
+    assert.equal(snapshot.retryRate,0);
+    assert.equal(snapshot.failureRate,0.25);
     assert.equal(snapshot.totalTokens,1475);
     assert.equal(snapshot.bookUsageComplete,true);
     assert.equal(snapshot.recent[0].title,'Prueba');

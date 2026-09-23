@@ -774,6 +774,12 @@ async function refreshMetrics() {
     document.getElementById('metricsTokens').textContent = number(data.totalTokens);
     document.getElementById('metricsBookTokens').textContent = number(data.bookTokens);
     document.getElementById('metricsBookAverage').textContent = data.averageTokensPerBook === null ? '—' : number(data.averageTokensPerBook);
+    document.getElementById('metricsBookInputAverage').textContent = data.averageInputTokensPerBook === null ? '—' : number(data.averageInputTokensPerBook);
+    document.getElementById('metricsBookOutputAverage').textContent = data.averageOutputTokensPerBook === null ? '—' : number(data.averageOutputTokensPerBook);
+    const percent = value => value === null ? '—' : `${(Number(value) * 100).toLocaleString('es-MX', {maximumFractionDigits:1})}%`;
+    document.getElementById('metricsOcrRate').textContent = `${number(data.booksWithOcr)} (${percent(data.ocrBookRate)})`;
+    document.getElementById('metricsRetryRate').textContent = percent(data.retryRate);
+    document.getElementById('metricsFailureRate').textContent = percent(data.failureRate);
     document.getElementById('metricsBookCoverage').textContent = `Promedio calculado sobre ${number(data.bookUsage.count)} libros generados con desglose disponible; excluye otros materiales y solicitudes fallidas.${data.bookUsageComplete ? '' : ' Historial o reporte de uso incompleto: cifras parciales.'}`;
     document.getElementById('metricsTokenDetail').textContent = `Entrada: ${number(data.inputTokens)} · Salida: ${number(data.outputTokens)} · Entrada en caché: ${number(data.cachedTokens)}`;
     document.getElementById('metricsLimit').textContent = data.limit === null ? 'Sin límite configurado' : `${number(data.completed)} / ${number(data.limit)} registros · ${number(data.remaining)} disponibles`;

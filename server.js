@@ -81,9 +81,8 @@ app.post('/api/extract-metadata', async (req, res) => {
     if (req.body.previous || req.body.missing) return res.status(400).json({error:'La búsqueda adicional fue retirada.'});
     recordId = metrics.reserve();
     let sourceText = text.includes('[') ? text : '[Texto aportado]\n' + text;
-    for (let i = 0; i < imgs.length; i += 3) {
-      const batch = imgs.slice(i, i + 3);
-      const ocr = await ocrAgent.process(batch, 'spa');
+    if (imgs.length) {
+      const ocr = await ocrAgent.process(imgs, 'spa');
       sourceText += '\n\n' + ocr.rawText;
     }
     sourceText = compactEvidence(sourceText);
@@ -108,7 +107,7 @@ app.post('/api/extract-metadata', async (req, res) => {
       pageCount
     });
 
-    metrics.finish(recordId, {success:true, format:formatType || 'book', usage, title:structured.metadata.title});
+    metrics.finish(recordId, {success:true, format:formatType || 'book', usage, title:structured.metadata.title, usedOcr:imgs.length > 0});
     success = true;
     res.json({ result, source: structured.metadata, metrics: metrics.snapshot() });
 
@@ -117,7 +116,7 @@ app.post('/api/extract-metadata', async (req, res) => {
     res.status(error.status || (error.code === 'NO_BIBLIOGRAPHIC_EVIDENCE' ? 422 : 500)).json({ error: error.message });
   } finally {
     if (recordId && !success) {
-      try { metrics.finish(recordId, {success:false, format:req.body.format || 'book', usage}); }
+      try { metrics.finish(recordId, {success:false, format:req.body.format || 'book', usage, usedOcr:Array.isArray(req.body.images) && req.body.images.some(i => i?.data)}); }
       catch (error) { console.error('No se pudieron guardar métricas:', error.message); }
     }
   }
