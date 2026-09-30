@@ -81,7 +81,7 @@ ALLOWED_ORIGINS="https://usuario.github.io"
 1. Selecciona el tipo: libro, capítulo, artículo, tesis o memorias.
 2. Sube un PDF o hasta 5 imágenes en una sola zona. Puedes agregar texto complementario del mismo recurso.
 3. El PDF se lee localmente: se seleccionan páginas relevantes y solo se aplica OCR donde no hay texto utilizable.
-4. El modelo estructura evidencia breve; se realiza una sola pasada y se genera un resumen breve de máximo 100 palabras.
+4. El modelo estructura evidencia breve; se realiza una sola pasada y se genera un resumen breve de máximo 100 palabras. El servidor limita el texto documental combinado a 4,000 tokens (`o200k_base`, familia GPT-5), además de la guarda de 18,000 caracteres. El presupuesto excluye las instrucciones y las imágenes enviadas a OCR; las métricas siguen mostrando el consumo completo reportado por la API.
 5. Revisa valores, fuentes, citas y propuestas automáticas. Edita y descarga MARCXML o importa al formulario de Koha.
 
 La interfaz ya no solicita agencia ni idioma de catalogación. Se describe en español y se conserva el idioma observado del recurso. `CATALOGING_AGENCY` permite configurar en Render el código institucional de 040; si está vacío se omiten $a/$c.
@@ -128,6 +128,6 @@ subcampo generado, la integracion lo omite y muestra un resumen.
 Las reglas de copyright como año alternativo, resumen siempre generado (máximo 100 palabras) y Dewey propuesto se definen en [la política de catalogación](docs/skill_catalogacion_automatica_rda_llm.md). Las etiquetas de revisión se generan en código.
 
 ## Panel de métricas y cuota
-El demo no tiene límite. El panel muestra registros generados, libros, tokens de entrada/salida, cuota e historial reciente. Cada despliegue representa una biblioteca y tiene su propio enlace. Configura `LIBRARY_ID`, `LIBRARY_NAME` y opcionalmente `LIBRARY_RECORD_LIMIT` para un límite acumulado de registros. No hay cobro automático ni límite por tokens.
+El demo no tiene límite de registros. El panel muestra registros generados, libros, tokens de entrada/salida, cuota e historial reciente. Cada despliegue representa una biblioteca y tiene su propio enlace. Configura `LIBRARY_ID`, `LIBRARY_NAME` y opcionalmente `LIBRARY_RECORD_LIMIT` para un límite acumulado de registros. No hay cobro automático ni cuota acumulada de tokens; sí existe el límite de 4,000 tokens de texto documental por estructuración.
 La generación incluye la marca 883, conservada en MARCXML y en la importación a Koha. Habilita 883 $a/$d/$q/$u en el framework. El informe SQL identifica estos registros y consulta el catalogador de alta en el historial de Koha cuando está disponible. El widget incluye estrellas de IA y un botón para ampliar/restaurar la ventana.
 Consulta [métricas y trazabilidad](docs/metrics-and-tracking.md) para las reglas de conteo, almacenamiento persistente y configuración. En Render gratuito el archivo de métricas es efímero; para conservar el historial usa un disco persistente y `METRICS_FILE`.

@@ -1,5 +1,6 @@
 import { COMMON_FIELDS, TYPE_FIELDS } from '../core/evidence.js';
 import { buildStructuringPrompt } from '../core/prompt-builder.js';
+import { limitEvidenceTokens } from '../core/evidence-budget.js';
 import { parseLLMResponse, validateMetadata, cleanLlmOutput } from '../core/llm-parser.js';
 
 const STRUCTURING_MODEL = process.env.OPENAI_STRUCTURING_MODEL || process.env.OPENAI_MODEL || 'gpt-5.5';
@@ -20,6 +21,7 @@ export class StructuringAgent {
       throw new Error('No text provided for structuring');
     }
 
+    rawText = limitEvidenceTokens(rawText);
     const prompt = buildStructuringPrompt(rawText, catLang, formatType);
     let timeoutId;
     try {

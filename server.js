@@ -1,6 +1,6 @@
 import { MetricsStore, newUsage, usageContext } from './src/core/metrics.js';
 import express from 'express';
-import { MAX_EVIDENCE_CHARS, compactEvidence } from './src/core/evidence.js';
+import { limitEvidenceTokens } from './src/core/evidence-budget.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -85,7 +85,7 @@ app.post('/api/extract-metadata', async (req, res) => {
       const ocr = await ocrAgent.process(imgs, 'spa');
       sourceText += '\n\n' + ocr.rawText;
     }
-    sourceText = compactEvidence(sourceText);
+    sourceText = limitEvidenceTokens(sourceText);
     const structured = await structuringAgent.structure(sourceText, {
       catLang: 'spa', formatType: formatType || 'book', pageCount
     });

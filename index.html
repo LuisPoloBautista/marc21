@@ -96,6 +96,7 @@
             <p id="metricsLimit">Consultando cuota…</p>
             <progress id="metricsQuota" max="1" value="0" aria-label="Uso de la cuota" hidden></progress>
             <p id="metricsStatus" role="status"></p>
+            <p class="upload-help">El texto documental enviado a estructuración tiene un máximo de 4 000 tokens, aparte de las instrucciones y las imágenes del OCR. Las métricas suman OCR y estructuración: la salida incluye la transcripción y los metadatos bibliográficos; el MARC21 se construye localmente.</p>
             <p class="upload-help">La cuota cuenta generaciones exitosas de todos los materiales, no registros guardados en Koha ni títulos únicos. Reutilizar el resultado en caché no consume otra unidad. Los tokens incluyen reintentos y solicitudes fallidas con uso reportado.</p>
             <p id="metricsStorage" class="upload-help"></p>
             <button type="button" id="refreshMetrics" class="btn-secondary">Actualizar métricas</button>
@@ -234,7 +235,7 @@
         <p>PDF o imágenes → evidencia seleccionada → JSON bibliográfico → revisión → MARC21.</p>
         <ul>
           <li>Libros: ventana inicial de 10 primeras y 3 últimas páginas; artículos: primeras 2 y última. Se buscan señales en el resto del texto.</li>
-          <li>Hasta 10 páginas candidatas por selección, con bloques deduplicados y presupuesto de 18 000 caracteres de evidencia.</li>
+          <li>Hasta 10 páginas candidatas por selección, con bloques deduplicados. El texto del documento enviado a estructuración se limita a 4 000 tokens, sin contar las instrucciones ni las imágenes del OCR.</li>
           <li>OCR solo cuando hace falta. Las imágenes conservan su número de carga; las páginas PDF, su número físico.</li>
           <li>Sin segunda búsqueda. Hasta 5 imágenes en total por generación; si se combinan archivos, las imágenes cargadas tienen prioridad sobre las páginas PDF que necesitan OCR.</li>
         </ul>
