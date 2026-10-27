@@ -2,7 +2,7 @@ import { getEncoding } from 'js-tiktoken';
 import { compactEvidence, MAX_EVIDENCE_CHARS } from './evidence.js';
 
 export const MAX_EVIDENCE_TOKENS = 4000;
-// Text-only budget for the configured GPT-5 family; not an image/request estimate.
+// Text-only evidence budget; not an image/request estimate.
 const tokenizer = getEncoding('o200k_base');
 
 export function countEvidenceTokens(text) {

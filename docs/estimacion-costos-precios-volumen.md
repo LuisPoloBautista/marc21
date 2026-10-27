@@ -18,7 +18,7 @@ Por cada libro, la aplicación ejecuta uno de estos flujos:
 1. **PDF con texto legible o texto aportado:** una llamada para estructurar los metadatos bibliográficos.
 2. **Imágenes o páginas que requieren OCR:** una llamada de visión para transcribir la evidencia y una llamada posterior para estructurar los metadatos.
 
-La aplicación acepta hasta **5 imágenes** y las procesa juntas, por lo que un libro puede producir como máximo **1 llamada de OCR** y **1 llamada de estructuración**. Desde el ajuste del 30 de septiembre de 2026, la evidencia de texto enviada a estructuración se limita a **4,000 tokens**, contados localmente con `js-tiktoken` y la codificación `o200k_base` para la familia GPT-5. Se conserva además el tope de selección de 18,000 caracteres. Si se cambia a un modelo con otra codificación, deberá adaptarse el tokenizador.
+La aplicación acepta hasta **5 imágenes** y las procesa juntas, por lo que un libro puede producir como máximo **1 llamada de OCR** y **1 llamada de estructuración**. La evidencia de texto enviada a estructuración se limita a **4,000 tokens**, contados localmente con `js-tiktoken` y la codificación `o200k_base`. Se conserva además el tope de selección de 18,000 caracteres. El conteo local es presupuestario; el consumo facturable definitivo es el reportado por la API.
 
 El presupuesto de 4,000 tokens se comparte entre texto del PDF, texto aportado, metadatos auxiliares y transcripción OCR, incluidos sus marcadores de fuente. **No incluye las instrucciones del prompt ni la entrada visual del OCR.** El servidor compacta la evidencia entre fuentes y vuelve a contar hasta cumplir el límite; no añade llamadas a la API. El recorte puede omitir datos, por lo que se mantiene la revisión catalográfica.
 
@@ -68,7 +68,7 @@ En una llamada de estructuración que use todo el límite, la entrada será de h
 
 Los **6,596 tokens de salida** son el máximo que la aplicación permite solicitar: una llamada OCR de hasta 2,500 tokens más una llamada de estructuración de hasta 4,096. No significa que OpenAI siempre produzca esa cantidad. No hay reintentos automáticos.
 
-Las imágenes se envían con detalle `high`. Para GPT-5.5, el código establece un máximo presupuestario de **3,000 tokens visuales por imagen** y **15,000 por libro**, basado en 2,500 parches por imagen multiplicados por el factor 1.2 del modelo.
+Las imágenes se envían con detalle `high`. El costo visual depende del modelo y las dimensiones procesadas; el límite constante del código es una cota operativa y no debe interpretarse como factura exacta.
 
 ### Escenario hipotético utilizado para calcular costos
 
@@ -92,15 +92,15 @@ Este escenario no procede de las pruebas perdidas ni representa un promedio demo
 
 ## 4. Tarifa de OpenAI utilizada
 
-La aplicación utiliza **GPT-5.5** por defecto. La tarifa estándar publicada por OpenAI a la fecha de este documento es:
+La aplicación utiliza **GPT-5 nano** (`gpt-5-nano`) por defecto para OCR y estructuración. Es la variante GPT-5 de menor costo y admite entrada de imágenes, pero OpenAI ya la marca como **obsoleta**; antes de producción debe confirmarse el acceso de la cuenta y mantenerse un plan de migración. La tarifa estándar publicada por OpenAI al 27 de octubre de 2026 es:
 
 | Tipo | Precio por 1 millón de tokens |
 |---|---:|
-| Entrada | USD 5.00 |
-| Entrada en caché | USD 0.50 |
-| Salida | USD 30.00 |
+| Entrada | USD 0.05 |
+| Entrada en caché | USD 0.005 |
+| Salida | USD 0.40 |
 
-Fuente: [documentación oficial del modelo GPT-5.5](https://developers.openai.com/api/docs/models/gpt-5.5).
+Fuente: [documentación oficial de GPT-5 nano](https://developers.openai.com/api/docs/models/gpt-5-nano).
 
 La estimación adopta la tarifa completa de entrada y no descuenta entrada en caché. Esto da un presupuesto conservador. No incluye procesamiento regional, que puede tener un recargo, ni cambios futuros en las tarifas del proveedor.
 
@@ -109,19 +109,19 @@ La estimación adopta la tarifa completa de entrada y no descuenta entrada en ca
 Fórmula:
 
 ```text
-Costo = (tokens de entrada / 1,000,000 × USD 5.00)
-      + (tokens de salida  / 1,000,000 × USD 30.00)
+Costo = (tokens de entrada / 1,000,000 × USD 0.05)
+      + (tokens de salida  / 1,000,000 × USD 0.40)
 ```
 
 Aplicación al escenario base:
 
 ```text
-Entrada: 12,164 / 1,000,000 × 5  = USD 0.06082
-Salida:   3,700 / 1,000,000 × 30 = USD 0.11100
-Total por libro                    = USD 0.17182
+Entrada: 12,164 / 1,000,000 × 0.05 = USD 0.0006082
+Salida:   3,700 / 1,000,000 × 0.40 = USD 0.0014800
+Total por libro                    = USD 0.0020882
 ```
 
-Para presupuestar variaciones, se recomienda reservar **USD 0.23 por libro** como bolsa operativa de IA. No es un redondeo de USD 0.17182: es una provisión para absorber variaciones normales. Con el tipo de cambio adoptado, el costo calculado es MXN 3.09 y la provisión es MXN 4.14.
+Para presupuestar variaciones, se recomienda reservar **USD 0.01 por libro** como bolsa operativa de IA. No es un redondeo del costo base: cubre variación visual, respuestas más largas y cambios normales de consumo. Con el tipo de cambio adoptado, el costo base es aproximadamente MXN 0.06 y la provisión MXN 0.18.
 
 ## 6. Costos por volumen
 
@@ -129,10 +129,10 @@ Para presupuestar variaciones, se recomienda reservar **USD 0.23 por libro** com
 
 | Volumen | Tokens de entrada | Tokens de salida | Tokens totales | Costo API estimado | Presupuesto de IA recomendado |
 |---:|---:|---:|---:|---:|---:|
-| 1 libro | 12,164 | 3,700 | 15,864 | USD 0.17 | USD 0.23 |
-| 100 libros | 1,216,400 | 370,000 | 1,586,400 | USD 17.18 | USD 23.00 |
-| 1,000 libros | 12,164,000 | 3,700,000 | 15,864,000 | USD 171.82 | USD 230.00 |
-| 5,000 libros | 60,820,000 | 18,500,000 | 79,320,000 | USD 859.10 | USD 1,150.00 |
+| 1 libro | 12,164 | 3,700 | 15,864 | USD 0.0021 | USD 0.01 |
+| 100 libros | 1,216,400 | 370,000 | 1,586,400 | USD 0.21 | USD 1.00 |
+| 1,000 libros | 12,164,000 | 3,700,000 | 15,864,000 | USD 2.09 | USD 10.00 |
+| 5,000 libros | 60,820,000 | 18,500,000 | 79,320,000 | USD 10.44 | USD 50.00 |
 
 El presupuesto recomendado es una provisión de consumo, no el precio de venta. El costo de la API representa solo una parte del servicio.
 
@@ -142,10 +142,10 @@ Para comparar se usa un **tipo de cambio presupuestario de MXN 18.00 por USD**. 
 
 | Volumen | Costo API estimado | Presupuesto de IA recomendado |
 |---:|---:|---:|
-| 1 libro | MXN 3.09 | MXN 4.14 |
-| 100 libros | MXN 309.28 | MXN 414.00 |
-| 1,000 libros | MXN 3,092.76 | MXN 4,140.00 |
-| 5,000 libros | MXN 15,463.80 | MXN 20,700.00 |
+| 1 libro | MXN 0.04 | MXN 0.18 |
+| 100 libros | MXN 3.76 | MXN 18.00 |
+| 1,000 libros | MXN 37.59 | MXN 180.00 |
+| 5,000 libros | MXN 187.94 | MXN 900.00 |
 
 ## 7. Propuesta comercial
 
@@ -173,9 +173,9 @@ Los cambios al framework MARC, migraciones, limpieza retrospectiva de registros 
 | 1,000 libros | MXN 12.00 | MXN 12,000 | MXN 35,000 | MXN 47,000 |
 | 5,000 libros | MXN 8.00 | MXN 40,000 | MXN 35,000 | MXN 75,000 |
 
-La demostración de un libro se propone sin costo porque su objetivo es permitir que la institución evalúe el resultado; su costo técnico estimado, cercano a MXN 4.14, se considera adquisición comercial.
+La demostración de un libro se propone sin costo porque su objetivo es permitir que la institución evalúe el resultado; su provisión técnica, cercana a MXN 0.18, se considera adquisición comercial.
 
-Los precios por volumen no se obtienen sumando solamente tokens. También remuneran el uso del sistema, mantenimiento, monitoreo, atención, riesgo de variación y desarrollo acumulado. Por ejemplo, el precio de MXN 18 por libro del paquete de 100 contiene aproximadamente MXN 4.14 de provisión de IA y MXN 13.86 para operación y margen. El cargo de implementación cubre por separado el trabajo inicial de configurar e integrar una biblioteca.
+Los precios por volumen no se obtienen sumando solamente tokens. También remuneran el uso del sistema, mantenimiento, monitoreo, atención, riesgo de variación y desarrollo acumulado. Por ejemplo, el precio de MXN 18 por libro del paquete de 100 contiene aproximadamente MXN 0.18 de provisión de IA y MXN 17.82 para operación y margen. El cargo de implementación cubre por separado el trabajo inicial de configurar e integrar una biblioteca.
 
 El precio cubre generaciones exitosas hasta el volumen contratado. La corrección intelectual final, autoridades, clasificación definitiva y validación catalográfica especializada permanecen bajo responsabilidad de la biblioteca. Una nueva extracción solicitada por cambios de fuente o sustitución de archivos cuenta como una generación adicional.
 
@@ -195,13 +195,13 @@ Para comparar los dos modelos se utiliza una biblioteca que contrata la implemen
 | Paquete de 1,000 libros | 1,000 × MXN 12 | MXN 12,000 |
 | **Ingreso total, sin IVA** |  | **MXN 47,000** |
 
-El costo presupuestado de OpenAI es de **MXN 4,140**. Si únicamente se descuenta el procesamiento de OpenAI, la contribución bruta sería igual en ambos modelos:
+El costo presupuestado de OpenAI es de **MXN 180** para 1,000 libros. Si únicamente se descuenta el procesamiento de OpenAI, la contribución bruta sería igual en ambos modelos:
 
 ```text
 Ingreso:                 MXN 47,000
-Procesamiento OpenAI:  − MXN  4,140
-Contribución bruta:      MXN 42,860
-Margen de contribución:        91.2%
+Procesamiento OpenAI:  − MXN    180
+Contribución bruta:      MXN 46,820
+Margen de contribución:        99.6%
 ```
 
 Esta contribución todavía no es la utilidad final: faltan el tiempo del personal, las pruebas, la capacitación y, cuando corresponda, la parte de infraestructura de Ignite asignada al proyecto.
@@ -214,21 +214,21 @@ Se supone que el AKS ya existe y tiene capacidad disponible, por lo que no se co
 
 | Costo para Ignite | Supuesto | Importe |
 |---|---:|---:|
-| Procesamiento OpenAI | 1,000 libros × MXN 4.14 | MXN 4,140 |
+| Procesamiento OpenAI | 1,000 libros × MXN 0.18 | MXN 180 |
 | Despliegue e integración | 32 horas × MXN 300 | MXN 9,600 |
 | Pruebas, capacitación y documentación | 8 horas × MXN 300 | MXN 2,400 |
 | Infraestructura AKS compartida | Asignación anual al cliente | MXN 6,000 |
 | Contingencia técnica | Ajustes y consumo extraordinario | MXN 2,000 |
-| **Costo total estimado para Ignite** |  | **MXN 24,140** |
+| **Costo total estimado para Ignite** |  | **MXN 20,180** |
 
 ```text
 Ingreso total:               MXN 47,000
-Costo total estimado:      − MXN 24,140
-Utilidad estimada Ignite:     MXN 22,860
-Margen estimado:                   48.6%
+Costo total estimado:      − MXN 20,180
+Utilidad estimada Ignite:     MXN 26,820
+Margen estimado:                   57.1%
 ```
 
-En este escenario, la **utilidad estimada para Ignite es MXN 22,860** durante el primer año. La asignación de MXN 6,000 debe sustituirse por el costo real proporcional del AKS cuando se conozcan el consumo de CPU, memoria, almacenamiento, respaldos y tráfico del cliente.
+En este escenario, la **utilidad estimada para Ignite es MXN 26,820** durante el primer año. La asignación de MXN 6,000 debe sustituirse por el costo real proporcional del AKS cuando se conozcan el consumo de CPU, memoria, almacenamiento, respaldos y tráfico del cliente.
 
 ### Escenario B: instalación en el servidor administrado por la biblioteca
 
@@ -236,32 +236,32 @@ La biblioteca aporta y administra su servidor o clúster, almacenamiento, certif
 
 | Costo para Ignite | Supuesto | Importe |
 |---|---:|---:|
-| Procesamiento OpenAI | 1,000 libros × MXN 4.14 | MXN 4,140 |
+| Procesamiento OpenAI | 1,000 libros × MXN 0.18 | MXN 180 |
 | Instalación e integración | 32 horas × MXN 300 | MXN 9,600 |
 | Pruebas, capacitación y documentación | 8 horas × MXN 300 | MXN 2,400 |
 | Infraestructura y almacenamiento | Aportados por la biblioteca | MXN 0 |
 | Contingencia técnica | Ajustes y consumo extraordinario | MXN 2,000 |
-| **Costo total estimado para Ignite** |  | **MXN 18,140** |
+| **Costo total estimado para Ignite** |  | **MXN 14,180** |
 
 ```text
 Ingreso total:               MXN 47,000
-Costo total estimado:      − MXN 18,140
-Utilidad estimada Ignite:     MXN 28,860
-Margen estimado:                   61.4%
+Costo total estimado:      − MXN 14,180
+Utilidad estimada Ignite:     MXN 32,820
+Margen estimado:                   69.8%
 ```
 
-En este escenario, la **utilidad estimada para Ignite es MXN 28,860**, porque Ignite no absorbe infraestructura ni administración del servidor de la biblioteca.
+En este escenario, la **utilidad estimada para Ignite es MXN 32,820**, porque Ignite no absorbe infraestructura ni administración del servidor de la biblioteca.
 
 ### Comparación
 
 | Concepto | Ignite aloja en AKS | Biblioteca administra su servidor |
 |---|---:|---:|
 | Ingreso del proyecto | MXN 47,000 | MXN 47,000 |
-| Costo presupuestado de OpenAI | MXN 4,140 | MXN 4,140 |
+| Costo presupuestado de OpenAI | MXN 180 | MXN 180 |
 | Trabajo, pruebas y contingencia | MXN 14,000 | MXN 14,000 |
 | Infraestructura asignada | MXN 6,000 | MXN 0 |
-| **Utilidad estimada para Ignite** | **MXN 22,860** | **MXN 28,860** |
-| **Margen estimado** | **48.6%** | **61.4%** |
+| **Utilidad estimada para Ignite** | **MXN 26,820** | **MXN 32,820** |
+| **Margen estimado** | **57.1%** | **69.8%** |
 
 El valor de MXN 300 por hora es un costo interno hipotético para medir rentabilidad. No representa necesariamente la tarifa mostrada al cliente. Los resultados son anteriores a IVA, ISR, comisiones de cobro y otros impuestos.
 

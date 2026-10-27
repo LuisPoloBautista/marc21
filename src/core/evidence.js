@@ -9,6 +9,16 @@ export function scorePage(page, total, format = 'book') {
   const initial = format === 'article' ? page.page <= 2 || page.page === total : page.page <= 10 || page.page > total - 3;
   return (initial ? 4 : 0) + (page.page > total - 3 ? 2 : 0) + (page.page <= 2 ? 5 : 0) + Math.min(30, (page.text.match(signals) || []).length * 3);
 }
+export function explainPage(page, total, format = 'book') {
+  const reasons = [];
+  if (page.page <= 2) reasons.push('inicio del recurso');
+  else if (format !== 'article' && page.page <= 10) reasons.push('ventana inicial del libro');
+  if (page.page > total - 3) reasons.push('página final o colofón posible');
+  const found = String(page.text || '').match(signals) || [];
+  if (found.length) reasons.push(`señales: ${[...new Set(found.map(s => s.toLowerCase()))].slice(0, 4).join(', ')}`);
+  if (!usableText(page.text)) reasons.push('requiere OCR');
+  return reasons;
+}
 export function reduceText(text, limit = 2600) {
   const lines = [...new Set(String(text).split(/\n+/).map(s => s.trim()).filter(Boolean))];
   let inSummary = false;
@@ -23,7 +33,7 @@ export function selectEvidence(pages, format = 'book') {
   let budget = MAX_EVIDENCE_CHARS;
   const seen = new Set();
   return pages
-    .map(p => ({ ...p, score: scorePage(p, total, format) }))
+    .map(p => ({ ...p, score: scorePage(p, total, format), reasons: explainPage(p, total, format) }))
     .filter(p => p.score > 0)
     .sort((a, b) => b.score - a.score || a.page - b.page)
     .filter(p => { const key = p.text.trim(); if (!key) return true; if (seen.has(key)) return false; seen.add(key); return true; })
@@ -41,11 +51,11 @@ export const TYPE_FIELDS = {
   thesis: ['degree','institution','advisor','place','year','pages','corporate'],
   proceedings: ['meetingName','meetingDate','meetingPlace','publisher','place','year','pages','isbn','edition','series','corporate']
 };
-export const COMMON_FIELDS = ['title','subtitle','author','authorRoles','language','doi','subjects','notes','notesKind','copyrightYear','dewey'];
+export const COMMON_FIELDS = ['title','subtitle','responsibilityStatement','author','authorRoles','language','doi','url','subjects','subjectSource','notes','notesKind','copyrightYear','dewey','corporateRole'];
 
 // Share the budget across sources so later OCR batches cannot be silently discarded.
 export function compactEvidence(text, limit = MAX_EVIDENCE_CHARS) {
-  const parts = String(text).split(/(?=\[(?:Página \d+|Imagen \d+|Texto aportado|Metadatos PDF)\])/).filter(s => s.trim());
+  const parts = String(text).split(/(?=\[(?:Página \d+|Imagen \d+|Texto aportado|Metadatos PDF|Fuente DOI|URL aportada)\])/).filter(s => s.trim());
   if (!parts.length) return '';
   let remaining = Math.max(0, limit - parts.length * 2);
   const sizes = parts.map(p => Math.min(p.length, 1000));

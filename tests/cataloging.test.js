@@ -8,6 +8,7 @@ import { selectEvidence, compactEvidence, usableText } from '../src/core/evidenc
 import { buildStructuringPrompt } from '../src/core/prompt-builder.js';
 import { cleanLlmOutput } from '../src/core/llm-parser.js';
 import { buildMarcRecord } from '../src/core/marc-builder.js';
+import { auditCatalogRecord } from '../src/core/catalog-audit.js';
 
 test('finds evidence beyond initial pages and retains final scanned pages', () => {
   const pages = Array.from({length:100}, (_,i) => ({page:i+1,text:''}));
@@ -158,4 +159,43 @@ test('provenance generates the requested 883 marker', () => {
   const marc = buildMarcRecord({title:'Libro',_provenance:{id:'old-id',date:'2026-01-01',library:'demo'}});
   assert.equal(marc['883'].u,'urn:uuid:old-id');
   assert.equal(marc['883'].a,'Catalogación automática MARC21');
+});
+
+test('deterministic MARC safeguards correct the reported cataloging errors', () => {
+  const metadata = {
+    title: 'Metadatos',
+    author: ['Ana Pérez', 'Luis Díaz'],
+    authorRoles: {'Ana Pérez':'coordinador','Luis Díaz':'coordinador'},
+    responsibilityStatement: 'Ana Pérez y Luis Díaz, coordinadores',
+    language: 'spa, eng',
+    pages: '240 páginas',
+    series: 'Metadatos',
+    corporate: 'Editorial Ejemplo',
+    subjects: ['Catalogación'],
+    doi: '10.1000/example',
+    evidence: { pages:{verified:true}, series:{verified:false} }
+  };
+  const marc = buildMarcRecord(metadata,{formatType:'book',agency:'MX-MxU'});
+  assert.equal(marc['040'].a,'MX-MxU');
+  assert.equal(marc['040'].c,'MX-MxU');
+  assert.equal(marc['008'].slice(35,38),'spa');
+  assert.equal(marc['041'].a,'spa eng');
+  assert.match(marc['245'].c,/coordinadores/);
+  assert.match(marc['300'].a,/páginas/);
+  assert.equal(marc['490'],undefined);
+  assert.equal(marc['710'],undefined);
+  assert.equal(marc['856'].u,'https://doi.org/10.1000/example');
+  assert.equal(marc['856'].ind1,'4');
+  assert.equal(buildMarcRecord({title:'Sin enlace'} ,{agency:'MX-MxU'})['856'],undefined);
+});
+
+test('quality score is deterministic and falls when verification finds issues', () => {
+  const clean = {title:'Libro',author:['Ana Pérez'],publisher:'Editorial',year:'2026',evidence:{title:{status:'observed',verified:true},publisher:{status:'observed',verified:true},year:{status:'observed',verified:true}}};
+  const record = buildMarcRecord(clean,{agency:'MX-MxU'});
+  const audit = auditCatalogRecord(clean,record,{formatType:'book'});
+  assert.equal(audit.score,100);
+  const broken = auditCatalogRecord({...clean,year:null},buildMarcRecord({...clean,year:null}),{formatType:'book'});
+  assert.ok(broken.score < audit.score);
+  assert.ok(broken.issues.some(issue => issue.field === '040'));
+  assert.ok(broken.issues.some(issue => issue.field === 'year'));
 });

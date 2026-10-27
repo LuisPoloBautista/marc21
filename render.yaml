@@ -9,7 +9,7 @@ services:
       - key: NODE_VERSION
         value: 20
       - key: OPENAI_MODEL
-        value: gpt-5.5
+        value: gpt-5-nano
       - key: OPENAI_API_KEY
         sync: false
       - key: ALLOWED_ORIGINS

@@ -2,6 +2,8 @@ import { selectEvidence, evidenceText, usableText, TYPE_FIELDS, COMMON_FIELDS } 
 const fileInput = document.getElementById("fileInput");
 const dropZone = document.getElementById("dropZone");
 const textInput = document.getElementById("textInput");
+const agencyInput = document.getElementById("agencyInput");
+const sourceUrlInput = document.getElementById("sourceUrlInput");
 const generateBtn = document.getElementById("generateBtn");
 const output = document.getElementById("output");
 const resultBlock = document.getElementById("resultBlock");
@@ -30,6 +32,7 @@ let sourceData = null;
 let lastExtractedText = "";
 let isEditMode = false;
 let kohaParentOrigin = null;
+let catalogAudit = null;
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -82,8 +85,14 @@ function invalidateResult() {
   inputRevision++;
   sourceData = null;
   marcData = null;
+  catalogAudit = null;
   resultBlock.style.display = 'none';
   document.getElementById('verificationBlock').style.display = 'none';
+}
+
+function selectedSourcesText(selected, ocrCount) {
+  const details = selected.map(page => `p. ${page.page} (${(page.reasons || []).join('; ') || 'puntuación bibliográfica'})`).join(' · ');
+  return `Fuentes seleccionadas: ${details}. OCR necesario en ${ocrCount}.`;
 }
 const imageInput = document.getElementById('imageInput');
 const imageDrop = document.getElementById('imageDrop');
@@ -184,7 +193,7 @@ async function handlePdf(file) {
     pdfImages = evidence.images;
     extractedText = evidence.text;
     pdfPreview.style.display = 'block';
-    pdfPreview.querySelector('.pdf-thumbnails').textContent = `Fuentes seleccionadas: páginas ${selectedPages.join(', ')}. OCR necesario en ${pdfImages.length}.`;
+    pdfPreview.querySelector('.pdf-thumbnails').textContent = selectedSourcesText(evidence.selected, pdfImages.length);
     dropZone.querySelector('p').textContent = `${file.name}: ${extractedPageCount} páginas leídas localmente; ${selectedPages.length} seleccionadas.`;
   } catch (e) {
     pdfDocument = null; pdfPages = []; pdfImages = []; extractedText = ''; extractedPageCount = null;
@@ -201,20 +210,26 @@ function getSelectedFormat() {
 }
 async function generateMarc() {
   let text = [extractedText, textInput.value.trim() ? '[Texto aportado]\n' + textInput.value.trim() : '', extractedPageCount ? '[Metadatos PDF]\n' + JSON.stringify({ ...pdfMetadata, technicalPageCount: extractedPageCount }) : ''].filter(Boolean).join('\n\n');
-  if (!text && pdfImages.length === 0 && uploadedImages.length === 0) {
+  const sourceUrl = sourceUrlInput.value.trim();
+  const agency = agencyInput.value.trim();
+  if (!agency) {
+    agencyInput.focus();
+    alert('Indica la agencia MARC para completar 040 $a y $c.');
+    return;
+  }
+  if (!text && pdfImages.length === 0 && uploadedImages.length === 0 && !sourceUrl) {
     alert("Por favor, ingresa texto, selecciona un archivo PDF o sube imágenes");
     return;
   }
 
   const standard = getSelectedStandard();
   const format = getSelectedFormat();
-  const agency = '';
   const catLang = 'spa';
 
   const imagesPayload = [...uploadedImages.map((i, n) => ({ label: `Imagen ${n + 1}`, data: i.data })), ...pdfImages.slice(0, 5 - uploadedImages.length)];
 
   const requestRevision = inputRevision;
-  const requestKey = JSON.stringify({ text, format, images: imagesPayload });
+  const requestKey = JSON.stringify({ text, format, agency, sourceUrl, images: imagesPayload });
   generateBtn.disabled = true;
   generateBtn.textContent = "Procesando...";
   output.textContent = "";
@@ -237,6 +252,8 @@ async function generateMarc() {
       const data = await res.json();
       if (requestRevision !== inputRevision) throw new Error("Los datos cambiaron durante el análisis. Genera el registro de nuevo.");
       marcData = data.result;
+      catalogAudit = data.audit;
+      renderQuality(catalogAudit);
       setProgress(100);
       setStage('build', 'done');
     } else {
@@ -253,7 +270,8 @@ async function generateMarc() {
           format,
           catLang,
           pageCount: extractedPageCount,
-          images: imagesPayload
+          images: imagesPayload,
+          sourceUrl
         })
       });
 
@@ -269,6 +287,7 @@ async function generateMarc() {
       if (requestRevision !== inputRevision) throw new Error("Los datos cambiaron durante el análisis. Genera el registro de nuevo.");
       marcData = data.result;
       sourceData = data.source;
+      catalogAudit = data.audit;
       lastRequestKey = requestKey;
       lastExtractedText = text;
 
@@ -277,6 +296,7 @@ async function generateMarc() {
       setStage('build', 'active');
 
       renderVerification(sourceData);
+      renderQuality(catalogAudit);
       document.getElementById('verificationBlock').style.display = 'block';
 
       setProgress(100);
@@ -296,6 +316,26 @@ async function generateMarc() {
     setStage('build', '');
     setProgress(0);
   } finally { await refreshMetrics(); }
+}
+
+function renderQuality(audit) {
+  const score = Number(audit?.score || 0);
+  document.getElementById('qualityScore').textContent = `${score}%`;
+  document.getElementById('qualityProgress').value = score;
+  document.getElementById('qualitySummary').textContent = `${audit?.label || 'Sin evaluación'}. Es una puntuación determinista basada en la verificación y las reglas MARC, no una probabilidad inventada por el modelo.`;
+  const list = document.getElementById('qualityIssues');
+  list.replaceChildren();
+  for (const issue of audit?.issues || []) {
+    const li = document.createElement('li');
+    const severity = issue.severity === 'high' ? 'Alta' : issue.severity === 'medium' ? 'Media' : 'Baja';
+    li.textContent = `${issue.field} · ${severity}: ${issue.message}`;
+    list.appendChild(li);
+  }
+  if (!(audit?.issues || []).length) {
+    const li = document.createElement('li');
+    li.textContent = 'No se detectaron observaciones automáticas.';
+    list.appendChild(li);
+  }
 }
 
 function subfieldSort(a, b) {
@@ -385,6 +425,7 @@ function renderVerification(source) {
   const fields = [
     { key: 'title', label: 'Título' },
     { key: 'subtitle', label: 'Subtítulo' },
+    { key: 'responsibilityStatement', label: 'Mención de responsabilidad' },
     { key: 'author', label: 'Autor(es)' },
     { key: 'publisher', label: 'Editorial' },
     { key: 'place', label: 'Lugar de publicación' },
@@ -392,11 +433,14 @@ function renderVerification(source) {
     { key: 'copyrightYear', label: 'Año de copyright' },
     { key: 'isbn', label: 'ISBN' },
     { key: 'doi', label: 'DOI' },
+    { key: 'url', label: 'URL' },
     { key: 'edition', label: 'Edición' },
     { key: 'pages', label: 'Páginas' },
     { key: 'subjects', label: 'Materias' },
+    { key: 'subjectSource', label: 'Fuente del vocabulario de materias' },
     { key: 'language', label: 'Idioma' },
     { key: 'series', label: 'Serie' },
+    { key: 'corporateRole', label: 'Función de entidad corporativa' },
     { key: 'hostTitle', label: 'Título de la revista/libro' },
     { key: 'volume', label: 'Volumen' },
     { key: 'issue', label: 'Número' },
@@ -449,7 +493,8 @@ function renderVerification(source) {
 
     html += '<tr><td>' + escapeHtml(f.label) + '</td><td>' + escapeHtml(displayValue) + '</td>';
     html += '<td class="' + statusClass + '">' + statusText + '</td>';
-    html += '<td>' + escapeHtml((ev?.source || 'Sin fuente') + (ev?.basis === 'copyright' ? ' · Año tomado del copyright' : '')) + '</td><td>' + escapeHtml(snippet || 'Sin evidencia literal') + '</td></tr>';
+    const sourceLabel = (ev?.source || 'Sin fuente') + (ev?.sourceType ? ` · ${ev.sourceType}` : '') + (ev?.basis === 'copyright' ? ' · Año tomado del copyright' : '');
+    html += '<td>' + escapeHtml(sourceLabel) + '</td><td>' + escapeHtml(snippet || 'Sin evidencia literal') + '</td></tr>';
   }
 
   tbody.innerHTML = html;
@@ -744,7 +789,7 @@ document.querySelectorAll('input[name="format"]').forEach(el => {
       generateBtn.disabled = true;
       try {
         const e = await prepareEvidence(); extractedText = e.text; pdfImages = e.images; selectedPages = e.selected.map(p => p.page);
-        pdfPreview.querySelector('.pdf-thumbnails').textContent = `Fuentes seleccionadas: páginas ${selectedPages.join(', ')}. OCR necesario en ${pdfImages.length}.`;
+        pdfPreview.querySelector('.pdf-thumbnails').textContent = selectedSourcesText(e.selected, pdfImages.length);
       } catch (error) { alert('No se pudo preparar la evidencia: ' + error.message); }
       finally { generateBtn.disabled = false; }
     }
@@ -759,6 +804,9 @@ textInput.addEventListener("input", () => {
     document.getElementById('verificationBlock').style.display = 'none';
   }
 });
+
+agencyInput.addEventListener('input', invalidateResult);
+sourceUrlInput.addEventListener('input', invalidateResult);
 
 async function refreshMetrics() {
   const status = document.getElementById('metricsStatus');

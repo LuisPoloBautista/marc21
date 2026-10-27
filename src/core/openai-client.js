@@ -52,7 +52,7 @@ export class OpenAiClient {
       content.push({
         type: 'input_image',
         image_url: image.startsWith('data:') ? image : `data:image/jpeg;base64,${image}`,
-        // GPT-5.5 high detail is capped at 2,500 patches × 1.2 = 3,000 image tokens.
+        // High detail preserves small bibliographic text; billing depends on the configured model.
         detail: 'high'
       });
     }

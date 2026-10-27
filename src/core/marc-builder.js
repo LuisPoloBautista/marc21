@@ -15,7 +15,6 @@ export function buildMarcRecord(metadata, opts = {}) {
   const isAnalytical = isArticle || isChapter;
   const agency = opts.agency || '';
   const catLang = opts.catLang || 'spa';
-  const subjectInd2 = '4';
   const now = new Date();
   const data = {};
 
@@ -64,6 +63,10 @@ export function buildMarcRecord(metadata, opts = {}) {
   const volume = asStr(metadata.volume);
   const issue = asStr(metadata.issue);
   const doi = asStr(metadata.doi);
+  const url = asStr(metadata.url);
+  const responsibilityStatement = asStr(metadata.responsibilityStatement);
+  const corporateRole = asStr(metadata.corporateRole).replace(/\.$/, '');
+  const subjectSource = asStr(metadata.subjectSource);
   const degree = asStr(metadata.degree);
   const institution = asStr(metadata.institution);
   const advisor = asStr(metadata.advisor);
@@ -83,8 +86,9 @@ export function buildMarcRecord(metadata, opts = {}) {
   data['005'] = ts;
 
   const langMap = { esp: 'spa', ing: 'eng', por: 'por', fre: 'fre', ger: 'ger', ita: 'ita', rus: 'rus' };
-  const rawLang = language.toLowerCase().slice(0, 3).replace(/[^a-z]/g, '');
-  const langCode = langMap[rawLang] || rawLang || 'spa';
+  const languageCodes = language.toLowerCase().split(/[,;\s]+/).map(code => code.slice(0, 3).replace(/[^a-z]/g, '')).filter(Boolean).map(code => langMap[code] || code).filter(code => code !== 'mul');
+  const uniqueLanguageCodes = [...new Set(languageCodes)];
+  const langCode = uniqueLanguageCodes[0] || 'und';
   const { type: dateType, date1, date2 } = detectDates(year);
   const placePub = detectCountry(place);
   const fict = ' ';
@@ -105,8 +109,8 @@ export function buildMarcRecord(metadata, opts = {}) {
   data['040'] = { ind1: ' ', ind2: ' ', b: catLang, e: 'rda' };
   if (agency) Object.assign(data['040'], { a: agency, c: agency });
 
-  if (language && langCode !== 'spa' && langCode !== '') {
-    data['041'] = { ind1: '0', ind2: ' ', a: langCode };
+  if (uniqueLanguageCodes.length > 1) {
+    data['041'] = { ind1: '0', ind2: ' ', a: uniqueLanguageCodes.join(' ') };
   }
 
   const personalAuthors = authors.filter(a => !isCorporateName(a));
@@ -148,12 +152,12 @@ export function buildMarcRecord(metadata, opts = {}) {
           data['710'] = { ind1: '2', ind2: ' ', a: effectiveCorporate + ',', e: 'organismo otorgante.' };
         }
       }
-    } else if (!isAnalytical) {
+    } else if (!isAnalytical && corporateRole) {
       const corps = effectiveCorporate.split(/\s*[;,\/]+\s*|\s+y\s+|\s+and\s+/i).filter(Boolean);
       if (corps.length > 1) {
-        data['710'] = corps.map(c => ({ ind1: '2', ind2: ' ', a: c.replace(/,$/, '') + ',', e: 'editor.' }));
+        data['710'] = corps.map(c => ({ ind1: '2', ind2: ' ', a: c.replace(/,$/, '') + ',', e: corporateRole + '.' }));
       } else {
-        data['710'] = { ind1: '2', ind2: ' ', a: effectiveCorporate.replace(/,$/, '') + ',', e: 'editor.' };
+        data['710'] = { ind1: '2', ind2: ' ', a: effectiveCorporate.replace(/,$/, '') + ',', e: corporateRole + '.' };
       }
     }
   }
@@ -177,7 +181,7 @@ export function buildMarcRecord(metadata, opts = {}) {
 
     let a = main;
     let b = sub || '';
-    let c = autorList ? autorList + '.' : '';
+    let c = responsibilityStatement ? responsibilityStatement.replace(/\.$/, '') + '.' : (autorList ? autorList + '.' : '');
 
     if (sub) a += ' :';
     if (c) {
@@ -239,14 +243,14 @@ export function buildMarcRecord(metadata, opts = {}) {
     if (isChapter || isArticle) {
       const rangeMatch = pagesSource.match(/(\d+)\s*[-–]\s*(\d+)/);
       if (rangeMatch) {
-        pagesField.a = 'paginas ' + rangeMatch[1] + '-' + rangeMatch[2];
+        pagesField.a = 'páginas ' + rangeMatch[1] + '-' + rangeMatch[2];
       } else {
-        pagesField.a = 'paginas ' + pagesSource.replace(/[^0-9]/g, '');
+        pagesField.a = 'páginas ' + pagesSource.replace(/[^0-9]/g, '');
       }
     } else {
       const match = pagesSource.match(/(\d+)/);
       const pagesNum = pagesSource.replace(/\s*(?:páginas|paginas|p\.)\s*$/i, '');
-      const unit = catLang === 'spa' ? ' paginas' : ' p.';
+      const unit = catLang === 'spa' ? ' páginas' : ' p.';
       let a = pagesNum + unit;
       const hasIllustrations = pagesSource.toLowerCase().includes('il') || pagesSource.toLowerCase().includes('fig');
       if (hasIllustrations) a += ' :';
@@ -268,7 +272,7 @@ export function buildMarcRecord(metadata, opts = {}) {
     }
   }
 
-  if (series) data['490'] = { ind1: '0', ind2: ' ', a: normalizeCase(series) };
+  if (series && metadata.evidence?.series?.verified === true) data['490'] = { ind1: '0', ind2: ' ', a: normalizeCase(series) };
 
   if (isAnalytical && hostTitle) {
     const hostField = { ind1: '0', ind2: ' ' };
@@ -325,7 +329,7 @@ export function buildMarcRecord(metadata, opts = {}) {
       if (isPlace(parts[0])) {
         mainIdx = 1;
       }
-      const field = { ind1: ' ', ind2: subjectInd2, a: parts[mainIdx] };
+      const field = { ind1: ' ', ind2: subjectSource ? '7' : '4', a: parts[mainIdx] };
       for (let i = 0; i < parts.length; i++) {
         if (i === mainIdx) continue;
         if (isCentury(parts[i])) {
@@ -336,9 +340,11 @@ export function buildMarcRecord(metadata, opts = {}) {
           field.x = field.x ? field.x + ', ' + parts[i] : parts[i];
         }
       }
+      if (subjectSource) field['2'] = subjectSource;
       subjectsFields.push(field);
     } else {
-      const sf = { ind1: ' ', ind2: subjectInd2, a: s };
+      const sf = { ind1: ' ', ind2: subjectSource ? '7' : '4', a: s };
+      if (subjectSource) sf['2'] = subjectSource;
       subjectsFields.push(sf);
     }
   }
@@ -350,7 +356,8 @@ export function buildMarcRecord(metadata, opts = {}) {
     if (chronFields.length > 0) data['648'] = chronFields;
   }
 
-  data['856'] = { ind1: ' ', ind2: ' ', a: '' };
+  const electronicUrl = url || (doi ? `https://doi.org/${doi}` : '');
+  if (electronicUrl) data['856'] = { ind1: '4', ind2: '0', u: electronicUrl };
 
   const effectiveDewey = /^\d{1,3}(\.\d+)?$/.test(dewey) ? dewey : '';
 

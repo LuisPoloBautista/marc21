@@ -141,7 +141,10 @@
 
   const style = document.createElement("style");
   style.textContent = [
-    "#marc21-assistant-launcher{position:fixed;right:24px;bottom:24px;z-index:1040;border:0;border-radius:999px;padding:13px 18px;background:#006100;color:#fff;box-shadow:0 4px 16px #0004;font-weight:600}",
+    "#marc21-assistant-launcher{position:fixed;right:24px;bottom:24px;z-index:1040;border:0;border-radius:999px;padding:13px 18px;background:#006100;color:#fff;box-shadow:0 4px 16px #0004;font-weight:600;cursor:pointer;transform-origin:center;transition:transform .22s ease,box-shadow .22s ease,background .22s ease}",
+    "#marc21-assistant-launcher:hover,#marc21-assistant-launcher:focus-visible{background:#007a42;box-shadow:0 10px 26px #0005;animation:marc21-assistant-bob .75s ease-in-out infinite alternate}",
+    "@keyframes marc21-assistant-bob{from{transform:translateY(-2px) scale(1.02)}to{transform:translateY(-7px) scale(1.05)}}",
+    "@media(prefers-reduced-motion:reduce){#marc21-assistant-launcher{transition:none}#marc21-assistant-launcher:hover,#marc21-assistant-launcher:focus-visible{animation:none;transform:none}}",
     "#marc21-assistant-modal{display:none;position:fixed;inset:0;z-index:2000;background:#0008;align-items:center;justify-content:center;padding:24px}",
     "#marc21-assistant-dialog{width:min(1200px,96vw);height:92vh;background:#fff;border-radius:8px;box-shadow:0 12px 40px #0007;display:flex;flex-direction:column;overflow:hidden}",
     "#marc21-assistant-header{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:#004d40;color:#fff}",

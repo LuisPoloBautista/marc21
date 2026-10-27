@@ -48,6 +48,9 @@ export function cleanLlmOutput(metadata, rawText, opts = {}) {
   // Normalize identifiers without choosing another manifestation from a regex match.
   if (metadata.isbn) metadata.isbn = String(metadata.isbn).replace(/[^0-9X]/gi, '');
   if (metadata.issn) metadata.issn = String(metadata.issn).trim();
+  if (metadata.doi) metadata.doi = String(metadata.doi).replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '').replace(/^doi:\s*/i, '').trim();
+  if (metadata.url && !/^https:\/\//i.test(String(metadata.url))) metadata.url = null;
+  if (String(metadata.language || '').trim().toLowerCase() === 'mul') metadata.language = null;
   // Dates, edition and extent must retain their bibliographic context.
 
   if (typeof metadata.title === 'string') metadata.title = metadata.title.trim();

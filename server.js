@@ -10,6 +10,8 @@ import { OpenAiClient } from './src/core/openai-client.js';
 import { buildMarcRecord } from './src/core/marc-builder.js';
 import { cleanLlmOutput, validateMetadata } from './src/core/llm-parser.js';
 import { cleanExtractedText } from './src/utils/helpers.js';
+import { auditCatalogRecord } from './src/core/catalog-audit.js';
+import { resolveExternalSource } from './src/core/external-source.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -21,7 +23,7 @@ export const metrics = new MetricsStore({
   limit: process.env.LIBRARY_RECORD_LIMIT ? Number(process.env.LIBRARY_RECORD_LIMIT) : null
 });
 const PORT = process.env.PORT || 3000;
-const DEFAULT_OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.5';
+const DEFAULT_OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5-nano';
 const openai = new OpenAiClient({
   apiKey: process.env.OPENAI_API_KEY,
   defaultModel: DEFAULT_OPENAI_MODEL
@@ -68,9 +70,9 @@ app.post('/api/extract-metadata', async (req, res) => {
   let success = false;
   return usageContext.run(usage, async () => {
   try {
-    const { text: rawText, standard, agency, format: formatType, catLang, pageCount, images } = req.body;
-    if (!rawText && (!images || images.length === 0)) {
-      return res.status(400).json({ error: 'Text or images are required' });
+    const { text: rawText, standard, agency, format: formatType, catLang, pageCount, images, sourceUrl } = req.body;
+    if (!rawText && (!images || images.length === 0) && !sourceUrl) {
+      return res.status(400).json({ error: 'Se requiere texto, imágenes, PDF, URL o DOI.' });
     }
 
     const text = cleanExtractedText(rawText || '');
@@ -81,6 +83,8 @@ app.post('/api/extract-metadata', async (req, res) => {
     if (req.body.previous || req.body.missing) return res.status(400).json({error:'La búsqueda adicional fue retirada.'});
     recordId = metrics.reserve();
     let sourceText = text.includes('[') ? text : '[Texto aportado]\n' + text;
+    const external = sourceUrl ? await resolveExternalSource(sourceUrl) : null;
+    if (external) sourceText += `\n\n[${external.marker}]\nURL: ${external.url}\n${external.text}`;
     if (imgs.length) {
       const ocr = await ocrAgent.process(imgs, 'spa');
       sourceText += '\n\n' + ocr.rawText;
@@ -99,17 +103,21 @@ app.post('/api/extract-metadata', async (req, res) => {
     }
 
     structured.metadata._provenance = { id: recordId, date: new Date().toISOString(), library: metrics.libraryId };
+    if (external?.url && !structured.metadata.url) structured.metadata.url = external.url;
+    if (external?.kind === 'doi' && !structured.metadata.doi) structured.metadata.doi = external.url.replace(/^https:\/\/doi\.org\//i, '');
 
+    const effectiveAgency = String(agency || process.env.CATALOGING_AGENCY || '').trim().slice(0, 40);
     const result = buildMarcRecord(structured.metadata, {
-      agency: process.env.CATALOGING_AGENCY || '',
+      agency: effectiveAgency,
       formatType: formatType || 'book',
       catLang: 'spa',
       pageCount
     });
+    const audit = auditCatalogRecord(structured.metadata, result, { formatType: formatType || 'book' });
 
     metrics.finish(recordId, {success:true, format:formatType || 'book', usage, title:structured.metadata.title, usedOcr:imgs.length > 0});
     success = true;
-    res.json({ result, source: structured.metadata, metrics: metrics.snapshot() });
+    res.json({ result, source: structured.metadata, audit, metrics: metrics.snapshot() });
 
   } catch (error) {
     if (!error.status) console.error('Error in /api/extract-metadata:', error);
@@ -131,13 +139,15 @@ app.post('/api/format', (req, res) => {
     const validated = validateMetadata(source);
     const cleaned = cleanLlmOutput(validated, text || '', { pageCount, formatType, preserveSummary: true });
 
+    const effectiveAgency = String(agency || process.env.CATALOGING_AGENCY || '').trim().slice(0, 40);
     const result = buildMarcRecord(cleaned, {
-      agency: process.env.CATALOGING_AGENCY || '',
+      agency: effectiveAgency,
       formatType: formatType || 'book',
       catLang: 'spa',
       pageCount
     });
-    res.json({ result });
+    const audit = auditCatalogRecord(cleaned, result, { formatType: formatType || 'book' });
+    res.json({ result, audit });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ error: error.message });

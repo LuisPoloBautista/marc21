@@ -4,6 +4,8 @@
 Usar el LLM como catalogador de evidencia, no como lector del documento completo. Prioridad: precisión, trazabilidad, economía de tokens y automatización. Esta skill define la política; `extraction-instructions.md` describe el algoritmo implementado, `document-templates.md` los campos por material y `master-prompt.md` el contrato del modelo. Los documentos se complementan y no se concatenan en cada petición.
 
 ## Fuentes
+Una URL aportada se consulta una sola vez; un DOI se resuelve como metadatos descriptivos. Son fuentes auxiliares identificadas y no desplazan la portada, página legal, colofón u otra fuente preferida de la manifestación.
+
 Identificar la función de la fuente por su contenido, nunca por su número de página. Preferir portada para título y responsabilidad; página legal para edición y publicación; cubierta, anteportada, portada de serie, colofón y otras partes como complemento. Conservar el número físico de página o el número de imagen cargada. Los metadatos internos del PDF son auxiliares, nunca superiores al recurso visible.
 
 ## Selección económica
@@ -16,6 +18,8 @@ Separar transcripción e interpretación. Transcribir títulos y nombres editori
 El idioma de catalogación es español; el idioma del contenido se identifica por evidencia. Se conservan los metadatos particulares de los cinco tipos documentales.
 
 ## Evidencia y revisión
+La interfaz muestra una puntuación de calidad determinista: parte de 100 y resta por errores, ambigüedades, propuestas y datos esenciales no verificados. No es una probabilidad emitida por el modelo.
+
 Cada campo incluye fuente, cita literal breve y estado observado/ambiguo/propuesto. El servidor comprueba que la cita aparezca en la fuente indicada. Esta comprobación no certifica la exactitud del OCR ni la interpretación bibliográfica. No presentar puntuaciones de confianza inventadas como garantías.
 Materias y resumen se proponen desde título, índice, resumen o introducción seleccionados: hasta 5 materias. Generar siempre un resumen en español de máximo estricto de 100 palabras, utilizando Abstract/Resumen como evidencia cuando exista. No atribuir un tesauro sin consultarlo. Proponer únicamente Dewey a partir de las materias, marcarlo como propuesta automática y revisar su pertinencia. No generar LC.
 

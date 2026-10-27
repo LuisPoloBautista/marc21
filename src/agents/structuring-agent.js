@@ -3,7 +3,7 @@ import { buildStructuringPrompt } from '../core/prompt-builder.js';
 import { limitEvidenceTokens } from '../core/evidence-budget.js';
 import { parseLLMResponse, validateMetadata, cleanLlmOutput } from '../core/llm-parser.js';
 
-const STRUCTURING_MODEL = process.env.OPENAI_STRUCTURING_MODEL || process.env.OPENAI_MODEL || 'gpt-5.5';
+const STRUCTURING_MODEL = process.env.OPENAI_STRUCTURING_MODEL || process.env.OPENAI_MODEL || 'gpt-5-nano';
 const TIMEOUT_MS = 180000;
 
 export class StructuringAgent {
