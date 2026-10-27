@@ -124,6 +124,7 @@
         <div class="catalog-row">
           <div class="cat-col">
             <label class="label-header">1. Sube un PDF</label>
+            <p class="upload-help catalog-help">Documento completo; se seleccionan localmente las páginas con evidencia bibliográfica.</p>
             <input type="file" id="fileInput" accept="application/pdf" style="display:none" />
             <div id="dropZone" class="drop-zone">
               <p>Arrastra y suelta un PDF aquí</p>
@@ -134,7 +135,7 @@
           </div>
           <div class="cat-col">
             <label class="label-header">2. Sube imágenes</label>
-            <p class="upload-help">Hasta 5 imágenes del mismo recurso: portada, página legal, índice o colofón. Se analizan como páginas de un documento.</p>
+            <p class="upload-help catalog-help">Hasta 5 imágenes del mismo recurso: portada, página legal, índice o colofón.</p>
             <input type="file" id="imageInput" accept="image/*" multiple hidden>
             <button type="button" id="imageDrop" class="drop-zone">Arrastra imágenes o haz clic para seleccionarlas</button>
             <p id="imageCount" aria-live="polite">0/5 imágenes</p>
@@ -142,6 +143,7 @@
           </div>
           <div class="cat-col">
             <label class="label-header">3. Describe</label>
+            <p class="upload-help catalog-help">Añade texto complementario sólo cuando ayude a identificar o describir el recurso.</p>
             <textarea id="textInput" rows="6" placeholder="Describe el contenido del documento aquí. También puedes pegar texto extraído manualmente."></textarea>
           </div>
         </div>

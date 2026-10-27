@@ -90,9 +90,8 @@ function invalidateResult() {
   document.getElementById('verificationBlock').style.display = 'none';
 }
 
-function selectedSourcesText(selected, ocrCount) {
-  const details = selected.map(page => `p. ${page.page} (${(page.reasons || []).join('; ') || 'puntuación bibliográfica'})`).join(' · ');
-  return `Fuentes seleccionadas: ${details}. OCR necesario en ${ocrCount}.`;
+function selectedSourcesText(selected) {
+  return `Fuentes seleccionadas: páginas ${selected.map(page => page.page).join(', ')}.`;
 }
 const imageInput = document.getElementById('imageInput');
 const imageDrop = document.getElementById('imageDrop');

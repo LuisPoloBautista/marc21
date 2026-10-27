@@ -23,7 +23,7 @@ export const metrics = new MetricsStore({
   limit: process.env.LIBRARY_RECORD_LIMIT ? Number(process.env.LIBRARY_RECORD_LIMIT) : null
 });
 const PORT = process.env.PORT || 3000;
-const DEFAULT_OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5-nano';
+const DEFAULT_OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5-mini';
 const openai = new OpenAiClient({
   apiKey: process.env.OPENAI_API_KEY,
   defaultModel: DEFAULT_OPENAI_MODEL

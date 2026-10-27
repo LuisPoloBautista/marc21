@@ -41,7 +41,7 @@ Variables disponibles:
 | Variable | Valor por defecto | Descripcion |
 |---|---|---|
 | `OPENAI_API_KEY` | requerido | Clave secreta de OpenAI. No la subas al repositorio. |
-| `OPENAI_MODEL` | `gpt-5-nano` | Variante GPT-5 de menor costo usada por defecto para OCR y estructuración. OpenAI la marca como obsoleta; conviene mantener evaluaciones y un plan de migración. |
+| `OPENAI_MODEL` | `gpt-5-mini` | Variante GPT-5 con mejor equilibrio entre calidad y costo para OCR y estructuración. OpenAI la marca como obsoleta; conviene mantener evaluaciones y un plan de migración. |
 | `OPENAI_OCR_MODEL` | `OPENAI_MODEL` | Modelo para imagenes/PDF renderizados. Debe soportar vision. |
 | `OPENAI_STRUCTURING_MODEL` | `OPENAI_MODEL` | Modelo para extraer metadata JSON del texto. |
 | `METRICS_FILE` | `.data/metrics.json` | Archivo de métricas; en producción debe estar dentro de almacenamiento persistente. |
@@ -55,7 +55,7 @@ Este repositorio incluye `render.yaml`.
 1. Sube el proyecto a GitHub.
 2. En Render, crea un nuevo **Blueprint** o **Web Service** desde el repositorio.
 3. Define la variable secreta `OPENAI_API_KEY` en el panel de Render.
-4. Mantén `OPENAI_MODEL=gpt-5-nano` si necesitas específicamente GPT-5, o cambia el modelo según tu cuenta y tus evaluaciones de calidad.
+4. Mantén `OPENAI_MODEL=gpt-5-mini` si necesitas específicamente GPT-5, o cambia el modelo según tu cuenta y tus evaluaciones de calidad.
 5. Deploy.
 
 El blueprint usa un servicio `starter` y un disco persistente para conservar métricas entre reinicios y despliegues. Esto genera cargos en Render. Render servira frontend y backend desde el mismo dominio, asi que no necesitas configurar GitHub Pages.

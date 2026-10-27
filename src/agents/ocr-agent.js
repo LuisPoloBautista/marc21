@@ -1,7 +1,7 @@
 import { buildOcrPrompt } from '../core/prompt-builder.js';
 import { parseRawOcrText } from '../core/llm-parser.js';
 
-const OCR_MODEL = process.env.OPENAI_OCR_MODEL || process.env.OPENAI_MODEL || 'gpt-5-nano';
+const OCR_MODEL = process.env.OPENAI_OCR_MODEL || process.env.OPENAI_MODEL || 'gpt-5-mini';
 const TIMEOUT_MS = 120000;
 
 export class OcrAgent {

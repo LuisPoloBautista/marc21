@@ -37,7 +37,7 @@ export class OpenAiClient {
     this.timeoutMs = timeoutMs;
   }
 
-  async generate({ model, prompt, images = [], maxOutputTokens = 4096, signal } = {}) {
+  async generate({ model, prompt, images = [], maxOutputTokens = 4096, jsonMode = false, signal } = {}) {
     if (!this.apiKey) {
       throw new Error('OPENAI_API_KEY is not configured on the server');
     }
@@ -69,6 +69,7 @@ export class OpenAiClient {
           model: model || this.defaultModel,
           input: [{ role: 'user', content }],
           max_output_tokens: maxOutputTokens,
+          ...(jsonMode ? { text: { format: { type: 'json_object' } } } : {}),
           store: false
         }),
         signal: timeout.signal
@@ -80,6 +81,9 @@ export class OpenAiClient {
       if (!response.ok) {
         const message = data.error?.message || `OpenAI request failed with status ${response.status}`;
         throw new Error(message);
+      }
+      if (data.status === 'incomplete') {
+        throw new Error(`OpenAI devolvió una respuesta incompleta (${data.incomplete_details?.reason || 'motivo desconocido'}).`);
       }
 
       return { response: extractOutputText(data), raw: data };

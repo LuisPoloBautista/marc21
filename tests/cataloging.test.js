@@ -67,10 +67,13 @@ test('API includes all images in one OCR call and verifies source-specific citat
     if (content.some(c=>c.type==='input_image')) {
       assert.equal(content.filter(c=>c.type==='input_image').length,5);
       assert.ok(content.filter(c=>c.type==='input_image').every(c=>c.detail==='high'));
+      assert.equal(body.text,undefined);
       const labels = prompt.split('Imágenes en orden: ')[1];
       response = labels.split(', ').map(label=>label+'\nEditorial de prueba').join('\n');
     } else {
       assert.ok(prompt.includes('[Imagen 5]'));
+      assert.equal(body.text?.format?.type,'json_object');
+      assert.equal(body.max_output_tokens,8192);
       response = JSON.stringify({title:'Prueba',publisher:'Editorial de prueba',author:[],evidence:{publisher:{source:'Imagen 5',quote:'Editorial de prueba',status:'observed'},title:{source:'Imagen 1',quote:'Cita inventada',status:'observed'}}});
     }
     return new Response(JSON.stringify({output_text:response,usage:{input_tokens:100,output_tokens:20,input_tokens_details:{cached_tokens:10}}}),{status:200});
