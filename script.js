@@ -47,8 +47,11 @@ function getApiBaseUrl() {
   return (window.MARC21_API_BASE_URL || localStorage.getItem('marc21ApiBaseUrl') || '').replace(/\/$/, '');
 }
 
-function apiFetch(path, options) {
-  return fetch(`${API_BASE_URL}${path}`, options);
+async function apiFetch(path, options) {
+  try { return await fetch(`${API_BASE_URL}${path}`, options); }
+  catch (error) {
+    throw new Error('No se pudo conectar con el servidor de catalogación. Comprueba que Render esté activo y que la URL de la API sea correcta.');
+  }
 }
 
 function setStage(stage, status) {

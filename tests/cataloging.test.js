@@ -9,6 +9,7 @@ import { buildStructuringPrompt } from '../src/core/prompt-builder.js';
 import { cleanLlmOutput } from '../src/core/llm-parser.js';
 import { buildMarcRecord } from '../src/core/marc-builder.js';
 import { auditCatalogRecord } from '../src/core/catalog-audit.js';
+import { OpenAiClient } from '../src/core/openai-client.js';
 
 test('finds evidence beyond initial pages and retains final scanned pages', () => {
   const pages = Array.from({length:100}, (_,i) => ({page:i+1,text:''}));
@@ -201,4 +202,20 @@ test('quality score is deterministic and falls when verification finds issues', 
   assert.ok(broken.score < audit.score);
   assert.ok(broken.issues.some(issue => issue.field === '040'));
   assert.ok(broken.issues.some(issue => issue.field === 'year'));
+});
+
+test('OpenAI client retries one transient connection failure', async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    if (calls === 1) throw new TypeError('fetch failed', {cause:{code:'ECONNRESET'}});
+    return new Response(JSON.stringify({output_text:'{"title":"Libro"}',usage:{input_tokens:1,output_tokens:1}}),{status:200});
+  };
+  try {
+    const client = new OpenAiClient({apiKey:'test',defaultModel:'gpt-5-mini',retryBaseMs:0});
+    const result = await client.generate({prompt:'Devuelve JSON',jsonMode:true});
+    assert.equal(result.response,'{"title":"Libro"}');
+    assert.equal(calls,2);
+  } finally { globalThis.fetch = originalFetch; }
 });

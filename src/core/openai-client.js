@@ -30,11 +30,45 @@ function extractOutputText(data) {
   return chunks.join('\n').trim();
 }
 
+function retryDelay(response, attempt, baseMs) {
+  const retryAfter = Number(response?.headers?.get('retry-after'));
+  if (Number.isFinite(retryAfter) && retryAfter >= 0) return Math.min(5000, retryAfter * 1000);
+  return baseMs * (2 ** attempt) + Math.floor(Math.random() * 150);
+}
+
+function isRetryableStatus(status) {
+  return [408, 409, 429].includes(status) || status >= 500;
+}
+
+async function fetchOpenAI(options, retryBaseMs) {
+  const maxAttempts = 2;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const response = await fetch(OPENAI_RESPONSES_URL, options);
+      if (attempt + 1 < maxAttempts && isRetryableStatus(response.status)) {
+        const delay = retryDelay(response, attempt, retryBaseMs);
+        await response.body?.cancel().catch(() => {});
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      return response;
+    } catch (error) {
+      if (error?.name === 'AbortError' || options.signal?.aborted) throw new Error('La solicitud a OpenAI excedió el tiempo disponible.');
+      if (attempt + 1 >= maxAttempts) {
+        const cause = error?.cause?.code || error?.code || error?.message || 'error de red desconocido';
+        throw new Error(`No se pudo conectar con la API de OpenAI (${cause}). Revisa la red saliente, DNS y certificados del servidor.`);
+      }
+      await new Promise(resolve => setTimeout(resolve, retryDelay(null, attempt, retryBaseMs)));
+    }
+  }
+}
+
 export class OpenAiClient {
-  constructor({ apiKey, defaultModel, timeoutMs = 300000 } = {}) {
+  constructor({ apiKey, defaultModel, timeoutMs = 300000, retryBaseMs = 500 } = {}) {
     this.apiKey = apiKey;
     this.defaultModel = defaultModel;
     this.timeoutMs = timeoutMs;
+    this.retryBaseMs = retryBaseMs;
   }
 
   async generate({ model, prompt, images = [], maxOutputTokens = 4096, jsonMode = false, signal } = {}) {
@@ -59,7 +93,7 @@ export class OpenAiClient {
 
     let usageReported = false;
     try {
-      const response = await fetch(OPENAI_RESPONSES_URL, {
+      const response = await fetchOpenAI({
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.apiKey}`,
@@ -73,7 +107,7 @@ export class OpenAiClient {
           store: false
         }),
         signal: timeout.signal
-      });
+      }, this.retryBaseMs);
 
       const data = await response.json().catch(() => ({}));
       reportUsage(data.usage);

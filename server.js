@@ -83,7 +83,15 @@ app.post('/api/extract-metadata', async (req, res) => {
     if (req.body.previous || req.body.missing) return res.status(400).json({error:'La búsqueda adicional fue retirada.'});
     recordId = metrics.reserve();
     let sourceText = text.includes('[') ? text : '[Texto aportado]\n' + text;
-    const external = sourceUrl ? await resolveExternalSource(sourceUrl) : null;
+    let external = null;
+    if (sourceUrl) {
+      try { external = await resolveExternalSource(sourceUrl); }
+      catch (error) {
+        const sourceError = new Error(`No se pudo consultar la URL o DOI aportado: ${error.message}`);
+        sourceError.status = 502;
+        throw sourceError;
+      }
+    }
     if (external) sourceText += `\n\n[${external.marker}]\nURL: ${external.url}\n${external.text}`;
     if (imgs.length) {
       const ocr = await ocrAgent.process(imgs, 'spa');
